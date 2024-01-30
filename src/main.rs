@@ -12,7 +12,7 @@ use serenity::{
         StandardFramework,
     },
     model::gateway::Ready,
-    prelude::{GatewayIntents, TypeMapKey},
+    prelude::GatewayIntents,
 };
 
 mod commands;
@@ -22,18 +22,15 @@ use crate::commands::music::deafen::*;
 use crate::commands::music::join::*;
 use crate::commands::music::leave::*;
 use crate::commands::music::mute::*;
+use crate::commands::music::play::*;
+use crate::commands::music::undeafen::*;
+use crate::commands::music::unmute::*;
 
 // tools
 use crate::commands::tools::ping::*;
 
 // kashi
 use crate::commands::kashi::kashi::*;
-
-struct HttpKey;
-
-impl TypeMapKey for HttpKey {
-    type Value = HttpClient;
-}
 
 struct Handler;
 
@@ -45,11 +42,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(
-    join, deafen, leave, mute,
-    ping,
-    kashi
-)]
+#[commands(join, deafen, leave, mute, play, unmute, undeafen, ping, kashi)]
 struct General;
 
 #[tokio::main]

@@ -12,7 +12,7 @@ async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
 
     let manager = songbird::get(ctx)
         .await
-        .expect("Client placed in at init.")
+        .expect("Client placed in at init")
         .clone();
 
     let has_handler = manager.get(guild_id).is_some();
