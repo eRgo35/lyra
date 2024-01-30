@@ -8,10 +8,7 @@ use serenity::{
     async_trait,
     client::{Client, EventHandler},
     framework::{
-        standard::{
-            macros::group,
-            Configuration,
-        },
+        standard::{macros::group, Configuration},
         StandardFramework,
     },
     model::gateway::Ready,
@@ -20,9 +17,10 @@ use serenity::{
 
 mod commands;
 
-use crate::commands::music::join::*;
 use crate::commands::music::deafen::*;
+use crate::commands::music::join::*;
 use crate::commands::music::leave::*;
+use crate::commands::music::mute::*;
 
 struct HttpKey;
 
@@ -40,9 +38,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(
-    join, deafen, leave
-)]
+#[commands(join, deafen, leave, mute)]
 struct General;
 
 #[tokio::main]

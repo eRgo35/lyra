@@ -1,8 +1,8 @@
 use serenity::async_trait;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::CommandResult;
+use serenity::model::prelude::*;
+use serenity::prelude::*;
 use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent};
 
 use crate::commands::misc::check_msg;
