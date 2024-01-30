@@ -1,3 +1,5 @@
+use serenity::gateway::ActivityData;
+use serenity::model::prelude::Message;
 use songbird::SerenityInit;
 
 use reqwest::Client as HttpClient;
@@ -8,12 +10,14 @@ use serenity::{
     async_trait,
     client::{Client, EventHandler},
     framework::{
-        standard::{macros::group, Configuration},
+        standard::{macros::group, macros::hook, Configuration},
         StandardFramework,
     },
     model::gateway::Ready,
     prelude::GatewayIntents,
 };
+
+use tracing::{info, instrument};
 
 mod commands;
 
@@ -23,6 +27,9 @@ use crate::commands::music::join::*;
 use crate::commands::music::leave::*;
 use crate::commands::music::mute::*;
 use crate::commands::music::play::*;
+use crate::commands::music::queue::*;
+use crate::commands::music::skip::*;
+use crate::commands::music::stop::*;
 use crate::commands::music::undeafen::*;
 use crate::commands::music::unmute::*;
 
@@ -36,13 +43,26 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        info!("{} [{}] connected successfully!", ready.user.name, ready.user.id);
+        let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
+        ctx.set_activity(Some(ActivityData::listening(prefix + "help")));
     }
 }
 
+#[hook]
+async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
+    info!(
+        "Received command [{}] from user [{}]",
+        command_name, msg.author.name
+    );
+    true
+}
+
 #[group]
-#[commands(join, deafen, leave, mute, play, unmute, undeafen, ping, kashi)]
+#[commands(
+    join, deafen, leave, mute, play, unmute, undeafen, ping, kashi, queue, stop, skip
+)]
 struct General;
 
 #[tokio::main]
@@ -54,15 +74,15 @@ async fn main() {
         std::env::var("DISCORD_TOKEN").expect("Environment variable `DISCORD_TOKEN` not found!");
     let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
 
-    let framework = StandardFramework::new().group(&GENERAL_GROUP);
+    let framework = StandardFramework::new().before(before).group(&GENERAL_GROUP);
     framework.configure(Configuration::new().prefix(prefix));
 
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
         .framework(framework)
         .register_songbird()
+        .event_handler(Handler)
         .type_map_insert::<HttpKey>(HttpClient::new())
         .await
         .expect("Error creating client");

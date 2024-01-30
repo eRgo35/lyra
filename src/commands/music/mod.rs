@@ -1,7 +1,11 @@
 pub mod deafen;
 pub mod join;
 pub mod leave;
+pub mod misc;
 pub mod mute;
 pub mod play;
+pub mod queue;
+pub mod skip;
+pub mod stop;
 pub mod undeafen;
 pub mod unmute;

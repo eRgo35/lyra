@@ -1,11 +1,10 @@
-use serenity::async_trait;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::CommandResult;
 use serenity::model::prelude::*;
 use serenity::prelude::*;
-use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent};
+use songbird::events::TrackEvent;
 
-use crate::commands::misc::check_msg;
+use crate::commands::{misc::check_msg, music::misc::TrackErrorNotifier};
 
 #[command]
 #[only_in(guilds)]
@@ -40,22 +39,4 @@ async fn join(ctx: &Context, msg: &Message) -> CommandResult {
     }
 
     Ok(())
-}
-
-struct TrackErrorNotifier;
-
-#[async_trait]
-impl VoiceEventHandler for TrackErrorNotifier {
-    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
-        if let EventContext::Track(track_list) = ctx {
-            for (state, handle) in *track_list {
-                println!(
-                    "Track {:?} had an error: {:?}",
-                    handle.uuid(),
-                    state.playing
-                );
-            }
-        }
-        None
-    }
 }
