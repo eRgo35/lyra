@@ -17,10 +17,17 @@ use serenity::{
 
 mod commands;
 
+// music management commands
 use crate::commands::music::deafen::*;
 use crate::commands::music::join::*;
 use crate::commands::music::leave::*;
 use crate::commands::music::mute::*;
+
+// tools
+use crate::commands::tools::ping::*;
+
+// kashi
+use crate::commands::kashi::kashi::*;
 
 struct HttpKey;
 
@@ -38,7 +45,11 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(join, deafen, leave, mute)]
+#[commands(
+    join, deafen, leave, mute,
+    ping,
+    kashi
+)]
 struct General;
 
 #[tokio::main]
