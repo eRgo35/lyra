@@ -1,0 +1,6 @@
+version: '2'
+
+services:
+  melvinjs:
+    container_name: lyra
+    build: .
