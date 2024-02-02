@@ -17,7 +17,7 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-        let queue = handler.queue();
+        let _queue = handler.queue();
 
         if let Err(e) = handler.deafen(false).await {
             check_msg(

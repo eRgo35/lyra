@@ -17,7 +17,7 @@ use serenity::{
     prelude::GatewayIntents,
 };
 
-use tracing::{info, instrument};
+use tracing::info;
 
 mod commands;
 
