@@ -6,6 +6,7 @@ use serenity::prelude::*;
 use crate::commands::misc::check_msg;
 
 #[command]
+#[aliases(q)]
 #[only_in(guilds)]
 async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
     let guild_id = msg.guild_id.unwrap();
