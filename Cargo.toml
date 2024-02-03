@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 dotenv = "0.15.0"
+openssl = { version = "0.10.63", features = ["vendored"] }
 regex = "1.10.3"
 reqwest = "0.11.23"
 serenity = { version = "0.12.0", features = ["cache", "framework", "standard_framework", "voice"] }
