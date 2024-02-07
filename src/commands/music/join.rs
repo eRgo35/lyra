@@ -9,15 +9,8 @@ use crate::commands::{misc::check_msg, music::misc::TrackErrorNotifier};
 #[command]
 #[only_in(guilds)]
 async fn join(ctx: &Context, msg: &Message) -> CommandResult {
-    let (guild_id, channel_id) = {
-        let guild = msg.guild(&ctx.cache).unwrap();
-        let channel_id = guild
-            .voice_states
-            .get(&msg.author.id)
-            .and_then(|voice_state| voice_state.channel_id);
-
-        (guild.id, channel_id)
-    };
+    let guild_id = msg.guild_id.unwrap();
+    let channel_id = msg.guild(&ctx.cache).unwrap().voice_states.get(&msg.author.id).and_then(|voice_state| voice_state.channel_id);
 
     let connect_to = match channel_id {
         Some(channel) => channel,

@@ -26,8 +26,16 @@ async fn mute(ctx: &Context, msg: &Message) -> CommandResult {
 
     let mut handler = handler_lock.lock().await;
 
-    if handler.is_mute() {
-        check_msg(msg.channel_id.say(&ctx.http, "Already muted").await);
+    if handler.is_mute() { 
+        if let Err(e) = handler.mute(false).await {
+            check_msg(
+                msg.channel_id
+                    .say(&ctx.http, format!("failed: {:?}", e))
+                    .await,
+            );
+        }
+
+        check_msg(msg.channel_id.say(&ctx.http, "Unmuted").await);
     } else {
         if let Err(err) = handler.mute(true).await {
             check_msg(

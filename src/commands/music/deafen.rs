@@ -27,7 +27,15 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
     let mut handler = handler_lock.lock().await;
 
     if handler.is_deaf() {
-        check_msg(msg.channel_id.say(&ctx.http, "Already deafened").await);
+        if let Err(err) = handler.deafen(false).await {
+            check_msg(
+                msg.channel_id
+                    .say(&ctx.http, format!("Failed: {:?}", err))
+                    .await,
+            );
+        }
+
+        check_msg(msg.channel_id.say(&ctx.http, "Undeafened").await);
     } else {
         if let Err(err) = handler.deafen(true).await {
             check_msg(

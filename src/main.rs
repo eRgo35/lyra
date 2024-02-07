@@ -30,8 +30,6 @@ use crate::commands::music::play::*;
 use crate::commands::music::queue::*;
 use crate::commands::music::skip::*;
 use crate::commands::music::stop::*;
-use crate::commands::music::undeafen::*;
-use crate::commands::music::unmute::*;
 
 // tools
 use crate::commands::tools::ping::*;
@@ -61,7 +59,7 @@ async fn before(_: &Context, msg: &Message, command_name: &str) -> bool {
 
 #[group]
 #[commands(
-    join, deafen, leave, mute, play, unmute, undeafen, ping, kashi, queue, stop, skip
+    join, deafen, leave, mute, play, ping, kashi, queue, stop, skip
 )]
 struct General;
 

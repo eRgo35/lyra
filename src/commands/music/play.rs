@@ -3,7 +3,7 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use reqwest::Client as HttpClient;
-use songbird::input::YoutubeDl;
+use songbird::input::{Compose, YoutubeDl};
 use songbird::events::TrackEvent;
 
 use crate::commands::{misc::check_msg, music::misc::TrackErrorNotifier};
@@ -31,18 +31,11 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         }
     };
 
-    let do_search = !url.starts_with("http");
+    let is_search = !url.starts_with("http");
 
-    let (guild_id, channel_id) = {
-        let guild = msg.guild(&ctx.cache).unwrap();
-        let channel_id = guild
-            .voice_states
-            .get(&msg.author.id)
-            .and_then(|voice_state| voice_state.channel_id);
+    let guild_id = msg.guild_id.unwrap();
+    let channel_id = msg.guild(&ctx.cache).unwrap().voice_states.get(&msg.author.id).and_then(|voice_state| voice_state.channel_id);
 
-        (guild.id, channel_id)
-    };
-    
     let connect_to = match channel_id {
         Some(channel) => channel,
         None => {
@@ -66,20 +59,23 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
 
     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
         let mut handler = handler_lock.lock().await;
-        
+       
+        if let Err(err) = handler.deafen(true).await {println!("Failed to deafen: {:?}", err)};
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
-        let src = if do_search {
-            YoutubeDl::new_ytdl_like("yt-dlp", http_client, url)
+        let mut src = if is_search {
+            println!("ytsearch:{}", url);
+            YoutubeDl::new_ytdl_like("yt-dlp", http_client, format!("ytsearch:{}", args.clone().message()))
         } else {
-            YoutubeDl::new(http_client, url)
+            YoutubeDl::new_ytdl_like("yt-dlp", http_client, url)
         };
         
         let _ = handler.enqueue_input(src.clone().into()).await;
-
+        
+        let metadata = src.aux_metadata().await.unwrap();
         // let _ = handler.play_input(src.clone().into());
 
-        check_msg(msg.channel_id.say(&ctx.http, "Playing song").await);
+        check_msg(msg.channel_id.say(&ctx.http, format!("Playing song: {}", metadata.title.unwrap())).await);
     } else {
         check_msg(
             msg.channel_id

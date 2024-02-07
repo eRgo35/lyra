@@ -17,7 +17,8 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-        let _queue = handler.queue();
+        let queue = handler.queue();
+        queue.stop();
 
         if let Err(e) = handler.deafen(false).await {
             check_msg(
@@ -31,7 +32,7 @@ async fn stop(ctx: &Context, msg: &Message) -> CommandResult {
     } else {
         check_msg(
             msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to undeafen in")
+                .say(&ctx.http, "Not in a voice channel!")
                 .await,
         );
     }
