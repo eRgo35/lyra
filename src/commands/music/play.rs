@@ -60,7 +60,7 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
         let mut handler = handler_lock.lock().await;
        
-        if let Err(err) = handler.deafen(true).await {println!("Failed to deafen: {:?}", err)};
+        // if let Err(err) = handler.deafen(true).await {println!("Failed to deafen: {:?}", err)};
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
         let mut src = if is_search {
@@ -73,7 +73,6 @@ async fn play(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
         let _ = handler.enqueue_input(src.clone().into()).await;
         
         let metadata = src.aux_metadata().await.unwrap();
-        // let _ = handler.play_input(src.clone().into());
 
         check_msg(msg.channel_id.say(&ctx.http, format!("Playing song: {}", metadata.title.unwrap())).await);
     } else {
