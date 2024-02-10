@@ -1,17 +1,16 @@
+use crate::{Context, Error};
 use std::time::SystemTime;
 
-use serenity::{all::Message, client::Context, framework::standard::{macros::command, CommandResult}};
+#[poise::command(prefix_command, slash_command)]
+pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
+    let system_now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap().as_millis() as i64;
 
-use crate::commands::misc::check_msg;
+    let message_now = ctx.created_at().timestamp_millis();
 
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    let system_now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() as i64;
-    let message_now = msg.timestamp.timestamp_millis();
-
-    // println!("System Time: {} ||| Message Time: {}", system_now, message_now);
-
-    check_msg(msg.reply(ctx, format!("Pong! (latency: {} ms)", system_now - message_now)).await);
+    let response = format!("Pong! (latency: {} ms)", system_now - message_now);
+    ctx.say(response).await?;
 
     Ok(())
 }

@@ -1,10 +1,10 @@
-use serenity::{all::Message, client::Context, framework::standard::{macros::command, CommandResult}};
+use crate::{Context, Error};
 
-use crate::commands::misc::check_msg;
-
-#[command]
-async fn kashi(ctx: &Context, msg: &Message) -> CommandResult {
-    check_msg(msg.reply(ctx, "Kashi lyrics platform integration").await);
+#[poise::command(prefix_command, slash_command)]
+pub async fn kashi(ctx: Context<'_>) -> Result<(), Error> {
+    
+    let response = format!("Kashi platform is currently under construction!");
+    ctx.say(response).await?;
 
     Ok(())
 }
