@@ -933,7 +933,7 @@ dependencies = [
 
 [[package]]
 name = "lyra"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "dotenv",
  "openssl",
@@ -2338,6 +2338,7 @@ dependencies = [
  "libc",
  "mio",
  "num_cpus",
+ "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",

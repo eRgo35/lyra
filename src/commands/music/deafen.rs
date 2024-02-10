@@ -1,24 +1,18 @@
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::CommandResult;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::{Context, Error};
 
-use crate::commands::misc::check_msg;
+#[poise::command(prefix_command, slash_command)]
+pub async fn deafen(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-#[command]
-#[only_in(guilds)]
-async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
-
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(&ctx.serenity_context())
         .await
-        .expect("Client placed at init")
+        .expect("Songbird client placed at init")
         .clone();
 
     let handler_lock = match manager.get(guild_id) {
         Some(handler) => handler,
         None => {
-            check_msg(msg.reply(ctx, "Not in a voice channel").await);
+            ctx.say("Not in a voice channel").await?;
 
             return Ok(());
         }
@@ -28,24 +22,16 @@ async fn deafen(ctx: &Context, msg: &Message) -> CommandResult {
 
     if handler.is_deaf() {
         if let Err(err) = handler.deafen(false).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", err))
-                    .await,
-            );
+            ctx.say(format!("Failed: {:?}", err)).await?;
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "Undeafened").await);
+        ctx.say("Undeafened").await?;
     } else {
         if let Err(err) = handler.deafen(true).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", err))
-                    .await,
-            );
+            ctx.say(format!("Failed: {:?}", err)).await?;
         }
 
-        check_msg(msg.channel_id.say(&ctx.http, "Deafened").await);
+        ctx.say("Deafened").await?;
     }
 
     Ok(())

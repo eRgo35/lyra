@@ -1,18 +1,12 @@
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::CommandResult;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::{Context, Error};
 
-use crate::commands::misc::check_msg;
+#[poise::command(prefix_command, slash_command)]
+pub async fn pause(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-#[command]
-#[only_in(guilds)]
-async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
-
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(&ctx.serenity_context())
         .await
-        .expect("Client placed at init")
+        .expect("Songbird client placed at init")
         .clone();
 
     if let Some(handler_lock) = manager.get(guild_id) {
@@ -20,20 +14,9 @@ async fn pause(ctx: &Context, msg: &Message) -> CommandResult {
         let queue = handler.queue();
         let _ = queue.pause();
 
-        check_msg(
-            msg.channel_id
-                .say(
-                    &ctx.http,
-                    format!("Song paused."),
-                )
-                .await,
-        );
+        ctx.say(format!("Song paused.")).await?;
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel to play in")
-                .await,
-        );
+        ctx.say("Not in a voice channel to play in").await?;
     }
 
     Ok(())

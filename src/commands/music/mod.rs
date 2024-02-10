@@ -7,6 +7,6 @@ pub mod play;
 pub mod queue;
 pub mod skip;
 pub mod stop;
-pub mod loopcurrent;
+pub mod repeat;
 pub mod pause;
 pub mod resume;

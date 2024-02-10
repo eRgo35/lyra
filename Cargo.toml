@@ -1,7 +1,15 @@
 [package]
 name = "lyra"
-version = "0.3.0"
+version = "0.4.0"
+authors = ["Michał Czyż <mike@c2yz.com>"]
 edition = "2021"
+description = "A featureful Discord bot written in Rust."
+documentation = "https://lyra.c2yz.com/docs"
+readme = "README.md"
+homepage = "https://lyra.c2yz.com"
+license-file = "LICENSE.md"
+keywords = ["discord", "bot", "rust", "music", "featureful"]
+
 
 [dependencies]
 dotenv = "0.15.0"
@@ -12,7 +20,7 @@ reqwest = "0.11.23"
 serenity = { version = "0.12.0", features = ["cache", "framework", "standard_framework", "voice"] }
 songbird = { version = "0.4.0", features = ["builtin-queue", "serenity"] }
 symphonia = "0.5.3"
-tokio = { version = "1.35.1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { version = "1.35.1", features = ["macros", "full", "signal"] }
 tracing = "0.1.40"
 tracing-futures = "0.2.5"
 tracing-subscriber = "0.3.18"

@@ -1,36 +1,24 @@
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::CommandResult;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::{Context, Error};
 
-use crate::commands::misc::check_msg;
+#[poise::command(prefix_command, slash_command)]
+pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
 
-#[command]
-#[aliases(q)]
-#[only_in(guilds)]
-async fn leave(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
-
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(&ctx.serenity_context())
         .await
-        .expect("Client placed in at init")
+        .expect("Songbird client placed at init")
         .clone();
 
-    let has_handler = manager.get(guild_id).is_some();
-
-    if has_handler {
-        if let Err(err) = manager.remove(guild_id).await {
-            check_msg(
-                msg.channel_id
-                    .say(&ctx.http, format!("Failed: {:?}", err))
-                    .await,
-            );
-        }
-
-        check_msg(msg.channel_id.say(&ctx.http, "Left voice channel").await);
-    } else {
-        check_msg(msg.reply(ctx, "Not in a voice channel").await);
+    if !manager.get(guild_id).is_some() {
+        ctx.say("Not in a voice channel").await?;
+        return Ok(())
     }
+
+    if let Err(err) = manager.remove(guild_id).await { 
+        ctx.say(format!("Failed: {:?}", err)).await?;
+    }
+
+    ctx.say("Left voice channel").await?;
 
     Ok(())
 }

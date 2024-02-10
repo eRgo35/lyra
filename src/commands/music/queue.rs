@@ -1,18 +1,12 @@
-use serenity::framework::standard::macros::command;
-use serenity::framework::standard::CommandResult;
-use serenity::model::prelude::*;
-use serenity::prelude::*;
+use crate::{Context, Error};
 
-use crate::commands::misc::check_msg;
-
-#[command]
-#[only_in(guilds)]
-async fn queue(ctx: &Context, msg: &Message) -> CommandResult {
-    let guild_id = msg.guild_id.unwrap();
+#[poise::command(prefix_command, slash_command)]
+pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().unwrap();
     
-    let manager = songbird::get(ctx)
+    let manager = songbird::get(&ctx.serenity_context())
         .await
-        .expect("Client placed at init")
+        .expect("Songbird client placed at init")
         .clone();
 
     if let Some(handler_lock) = manager.get(guild_id) {
@@ -30,18 +24,10 @@ async fn queue(ctx: &Context, msg: &Message) -> CommandResult {
         ));
         }
         
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, queue_res)
-                .await,
-        );
+        ctx.say(queue_res).await?;
 
     } else {
-        check_msg(
-            msg.channel_id
-                .say(&ctx.http, "Not in a voice channel!")
-                .await,
-        );
+        ctx.say("Not in a voice channel!").await?;
     }
 
     Ok(())

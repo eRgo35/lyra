@@ -1,5 +1,7 @@
 # License
 
-Copyright(c) Michał Czyż 2024
+Copyright (C) 2024 Michał Czyż
 
-[Currently] All Rights Reserved.
+All Rights Reserved.
+
+This build is private and shall not be distributed nor modified without permission.

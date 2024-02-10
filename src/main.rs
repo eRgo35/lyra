@@ -4,8 +4,13 @@ use poise::serenity_prelude::{self as serenity, ActivityData};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn, error};
+use reqwest::Client as HttpClient;
 
+mod http;
 mod commands;
+
+// http typemap for handling requests
+use crate::http::HttpKey;
 
 // commands: music
 use crate::commands::music::deafen::*;
@@ -16,7 +21,7 @@ use crate::commands::music::play::*;
 use crate::commands::music::queue::*;
 use crate::commands::music::skip::*;
 use crate::commands::music::stop::*;
-use crate::commands::music::loopcurrent::*;
+use crate::commands::music::repeat::*;
 use crate::commands::music::pause::*;
 use crate::commands::music::resume::*;
 
@@ -66,7 +71,7 @@ async fn main() {
         deafen(),
         join(),
         leave(),
-        loopcurrent(),
+        repeat(),
         mute(),
         pause(),
         play(),
@@ -144,6 +149,7 @@ async fn main() {
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .register_songbird()
+        .type_map_insert::<HttpKey>(HttpClient::new())
         .await
         .expect("Error creating client");
 
