@@ -1,35 +1,17 @@
-use songbird::SerenityInit;
-
-use poise::serenity_prelude::{self as serenity, ActivityData};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{info, warn, error};
+use poise::serenity_prelude::{self as serenity, ActivityData};
+use songbird::SerenityInit;
 use reqwest::Client as HttpClient;
 
-mod http;
 mod commands;
+mod http;
 
-// http typemap for handling requests
+use crate::commands::kashi;
+use crate::commands::music;
+use crate::commands::tools;
 use crate::http::HttpKey;
-
-// commands: music
-use crate::commands::music::deafen::*;
-use crate::commands::music::join::*;
-use crate::commands::music::leave::*;
-use crate::commands::music::mute::*;
-use crate::commands::music::play::*;
-use crate::commands::music::queue::*;
-use crate::commands::music::skip::*;
-use crate::commands::music::stop::*;
-use crate::commands::music::repeat::*;
-use crate::commands::music::pause::*;
-use crate::commands::music::resume::*;
-
-// commands: tools
-use crate::commands::tools::ping::*;
-
-// commands: kashi
-use crate::commands::kashi::kashi::*;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -50,16 +32,8 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     }
 }
 
-// this is for debug only
-#[poise::command(prefix_command)]
-pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
-    poise::builtins::register_application_commands_buttons(ctx).await?;
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() {
-    // logger and dotenv initialization
     tracing_subscriber::fmt::init();
     dotenv::dotenv().expect("Failed to load .env file.");
 
@@ -67,24 +41,20 @@ async fn main() {
     let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
 
     let commands = vec![
-        // commands: music
-        deafen(),
-        join(),
-        leave(),
-        repeat(),
-        mute(),
-        pause(),
-        play(),
-        queue(),
-        resume(),
-        skip(),
-        stop(),
-        // commands: tools
-        ping(),
-        // commands: kashi
-        kashi(),
-        // commands: debug
-        register(),
+        kashi::kashi(),
+        music::deafen(),
+        music::join(),
+        music::leave(),
+        music::repeat(),
+        music::mute(),
+        music::pause(),
+        music::play(),
+        music::queue(),
+        music::resume(),
+        music::skip(),
+        music::stop(),
+        tools::ping(),
+        tools::register(),
     ];
 
     let options = poise::FrameworkOptions {

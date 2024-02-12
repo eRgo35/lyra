@@ -13,13 +13,14 @@ keywords = ["discord", "bot", "rust", "music", "featureful"]
 
 [dependencies]
 dotenv = "0.15.0"
+fancy-regex = "0.13.0"
 openssl = { version = "0.10.63", features = ["vendored"] }
 poise = "0.6.1"
 regex = "1.10.3"
 reqwest = "0.11.23"
 serenity = { version = "0.12.0", features = ["cache", "framework", "standard_framework", "voice"] }
 songbird = { version = "0.4.0", features = ["builtin-queue", "serenity"] }
-symphonia = "0.5.3"
+symphonia = { version = "0.5.3", features = ["aac", "adpcm", "alac", "flac", "mpa", "isomp4"] }
 tokio = { version = "1.35.1", features = ["macros", "full", "signal"] }
 tracing = "0.1.40"
 tracing-futures = "0.2.5"
