@@ -1,14 +1,38 @@
 use crate::{Context, Error};
 
+use fancy_regex::Regex;
+use regex::Regex as Regex_Classic;
+use std::process::Command;
+use std::time::Duration;
+use poise::CreateReply;
+use poise::serenity_prelude::CreateEmbed;
+use poise::serenity_prelude::Colour;
+use poise::serenity_prelude::model::Timestamp;
+use serenity::builder::CreateEmbedAuthor;
+use serenity::builder::CreateEmbedFooter;
+use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
 use songbird::events::TrackEvent;
 
 use crate::commands::music::misc::TrackErrorNotifier;
 use crate::http::HttpKey;
 
-#[poise::command(prefix_command, slash_command)]
-pub async fn play(ctx: Context<'_>, url: String) -> Result<(), Error> {
-    let is_search = !url.starts_with("http");
+#[poise::command(
+    prefix_command, 
+    slash_command, 
+    aliases("p", "enqueue")
+)]
+pub async fn play(
+    ctx: Context<'_>, 
+    #[description = "Provide a query or an url"] #[rest] mut song: String,
+) -> Result<(), Error> {
+    let regex_spotify = Regex::new(r"https?:\/\/(?:embed\.|open\.)(?:spotify\.com\/)(?:track\/|\?uri=spotify:track:)((\w|-)+)(?:(?=\?)(?:[?&]foo=(\d*)(?=[&#]|$)|(?![?&]foo=)[^#])+)?(?=#|$)").unwrap();
+    let regex_youtube = Regex_Classic::new(r#""url": "(https://www.youtube.com/watch\?v=[A-Za-z0-9]{11})""#).unwrap();
+    let regex_youtube_playlist = Regex::new(r"^((?:https?:)\/\/)?((?:www|m)\.)?((?:youtube\.com)).*(youtu.be\/|list=)([^#&?]*).*").unwrap();   
+
+    let is_playlist = regex_youtube_playlist.is_match(&song).unwrap();
+    let is_spotify = regex_spotify.is_match(&song).unwrap();
+    let is_query = !song.starts_with("http");
 
     let guild_id = ctx.guild_id().unwrap();
     let channel_id = ctx.guild().unwrap().voice_states.get(&ctx.author().id).and_then(|voice_state| voice_state.channel_id);
@@ -17,7 +41,7 @@ pub async fn play(ctx: Context<'_>, url: String) -> Result<(), Error> {
         Some(channel) => channel,
         None => {
             ctx.say("Not in a voice channel").await?;
-        
+
             return Ok(());
         }
     };
@@ -36,25 +60,101 @@ pub async fn play(ctx: Context<'_>, url: String) -> Result<(), Error> {
 
     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
         let mut handler = handler_lock.lock().await;
-       
-        // if let Err(err) = handler.deafen(true).await {println!("Failed to deafen: {:?}", err)};
+
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
-        let mut src = if is_search {
-            println!("ytsearch:{}", url);
-            YoutubeDl::new_ytdl_like("yt-dlp", http_client, format!("ytsearch:{}", url))
-        } else {
-            YoutubeDl::new_ytdl_like("yt-dlp", http_client, url)
-        };
-        
-        let _ = handler.enqueue_input(src.clone().into()).await;
-        
-        let _metadata = src.aux_metadata().await.unwrap();
+        if is_playlist {
+            let raw_list = Command::new("yt-dlp")
+                .args(["-j", "--flat-playlist", &song])
+                .output()
+                .expect("failed to execute process")
+            .stdout;
 
-        // ctx.say(format!("Playing song: {}", metadata.title.unwrap())).await?;
-    } else {
-        ctx.say("Not in a voice channel to play in").await?;
+            let list = String::from_utf8(raw_list.clone()).expect("Invalid UTF-8");
+
+            let urls: Vec<String> = regex_youtube.captures_iter(&list).map(|capture| capture[1].to_string()).collect();
+            
+            let mut sources: Vec<YoutubeDl> = vec![];
+
+            for url in urls {
+                let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), url);
+                let _ = handler.enqueue_input(src.clone().into()).await;
+                sources.push(src);
+            }
+
+            let embed = generate_playlist_embed(ctx, sources).await;
+            let response = CreateReply::default().embed(embed.unwrap());
+            ctx.send(response).await?;
+        } else {
+            if is_spotify {
+                let exec = format!("node ./src/spotify --url {}", song);
+                let query = Command::new("sh").arg("-c").arg(exec).output().expect("failed to execute process").stdout;
+                let query_str = String::from_utf8(query.clone()).expect("Invalid UTF-8");
+                song = format!("ytsearch:{}", query_str.to_string());
+
+            }
+
+            if is_query {
+                song = format!("ytsearch:{}", song);
+            }
+
+            let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, song); 
+            let _ = handler.enqueue_input(src.clone().into()).await;
+        
+            let embed = generate_embed(ctx, src).await;
+            let response = CreateReply::default().embed(embed.unwrap());
+            ctx.send(response).await?;
+        }
     }
 
     Ok(())
+}
+
+async fn generate_embed(ctx: Context<'_>, src: YoutubeDl) -> Result<CreateEmbed, Error> {
+    let metadata = src.clone().aux_metadata().await.unwrap();
+    let AuxMetadata {title, thumbnail, source_url, artist, duration, ..} = metadata;
+    let timestamp = Timestamp::now();
+    let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
+    let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
+
+    let embed = CreateEmbed::default()
+        .author(CreateEmbedAuthor::new("Track enqueued").icon_url(ctx.author().clone().face()))
+        .colour(Colour::from_rgb(255, 58, 97))
+        .title(title.unwrap())
+        .url(source_url.unwrap())
+        .thumbnail(thumbnail.unwrap_or(ctx.cache().current_user().face()))
+        .field("Artist", artist.unwrap_or("Unknown Artist".to_string()), true)
+        .field("Duration", format!("{:02}:{:02}", duration_minutes, duration_seconds), true)
+        .field("DJ", ctx.author().name.clone(), true)
+        .timestamp(timestamp)
+        .footer(CreateEmbedFooter::new(ctx.cache().current_user().name.to_string()).icon_url(ctx.cache().current_user().face()));
+
+    Ok(embed)
+}
+
+async fn generate_playlist_embed(ctx: Context<'_>, sources: Vec<YoutubeDl>) -> Result<CreateEmbed, Error> {
+    let src = sources.get(0).unwrap();
+    
+    let metadata = src.clone().aux_metadata().await.unwrap();
+    let AuxMetadata {title, thumbnail, source_url, artist, duration, ..} = metadata;
+    let timestamp = Timestamp::now();
+    let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
+    let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
+    
+    let description = format!("Enqueued tracks: {}", sources.len() - 1);
+
+    let embed = CreateEmbed::default()
+        .author(CreateEmbedAuthor::new("Playlist enqueued").icon_url(ctx.author().clone().face()))
+        .colour(Colour::from_rgb(255, 58, 97))
+        .title(title.unwrap())
+        .url(source_url.unwrap())
+        .thumbnail(thumbnail.unwrap_or(ctx.cache().current_user().face()))
+        .field("Artist", artist.unwrap_or("Unknown Artist".to_string()), true)
+        .field("Duration", format!("{:02}:{:02}", duration_minutes, duration_seconds), true)
+        .field("DJ", ctx.author().name.clone(), true)
+        .description(description)
+        .timestamp(timestamp)
+        .footer(CreateEmbedFooter::new(ctx.cache().current_user().name.to_string()).icon_url(ctx.cache().current_user().face()));
+
+    Ok(embed)
 }
