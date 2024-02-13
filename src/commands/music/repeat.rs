@@ -1,8 +1,19 @@
-use crate::{Context, Error};
+use crate::{commands::embeds::{error_embed, embed}, Context, Error};
+use poise::CreateReply;
 use songbird::tracks::LoopState;
 
-#[poise::command(prefix_command, slash_command)]
-pub async fn repeat(ctx: Context<'_>, times: usize) -> Result<(), Error> {
+/// Loops currently playing song provided amount of times; \
+/// aliases: repeat, loop, while, for
+#[poise::command(
+    prefix_command, 
+    slash_command,
+    aliases("loop", "while", "for"),
+    category = "Music"
+)]
+pub async fn repeat(
+    ctx: Context<'_>, 
+    #[description = "How many times"] #[rest] times: usize
+) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
     let manager = songbird::get(&ctx.serenity_context())
@@ -22,21 +33,37 @@ pub async fn repeat(ctx: Context<'_>, times: usize) -> Result<(), Error> {
             LoopState::Infinite => {
                 let _ = queue.current().unwrap().disable_loop();
 
-                ctx.say("Song unlooped.").await?;
+                ctx.send(
+                    CreateReply::default().embed(embed(ctx, "Song Unlooped!", "", "").await.unwrap())
+                ).await?;
             }
             LoopState::Finite(_) => { 
-                if times < 100 {
+                if times == 0 {
+                    let _ = queue.current().unwrap().disable_loop();
+
+                    ctx.send(
+                        CreateReply::default().embed(embed(ctx, "Song Unlooped!", "", "").await.unwrap())
+                    ).await?;
+                }
+                else if times < 100 {
                     let _ = queue.current().unwrap().loop_for(times);
-                    ctx.say("Song looped forever (a very long time)").await?;
+                    ctx.send(
+                        CreateReply::default().embed(embed(ctx, &format!("Song looped {} times!", times), "You definitelly love this song!", "").await.unwrap())
+                    ).await?;
                 }
                 else {
                     let _ = queue.current().unwrap().enable_loop();
-                    ctx.say(format!("Song looped {} times.", times)).await?;
+                    ctx.send(
+                        CreateReply::default().embed(embed(ctx, "Song looped forever!", "A very long time!", "").await.unwrap())
+                    ).await?;
                 }
             }
         }
-    } else {
-        ctx.say("Not in a voice channel to play in").await?;
+    } else { 
+        let msg = "I am not in a voice channel!";
+        ctx.send(
+            CreateReply::default().embed(error_embed(ctx, msg).await.unwrap())
+        ).await?;
     }
 
     Ok(())

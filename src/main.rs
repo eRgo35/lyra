@@ -55,6 +55,7 @@ async fn main() {
         music::stop(),
         tools::ping(),
         tools::register(),
+        tools::help(),
     ];
 
     let options = poise::FrameworkOptions {

@@ -1,8 +1,15 @@
 use crate::{Context, Error};
 use std::time::SystemTime;
 
-#[poise::command(prefix_command, slash_command)]
-pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
+/// Pings you backs with a response time
+#[poise::command(
+    prefix_command,
+    slash_command,
+    category = "Tools"
+)]
+pub async fn ping(
+    ctx: Context<'_>
+) -> Result<(), Error> {
     let system_now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap().as_millis() as i64;

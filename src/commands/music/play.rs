@@ -1,4 +1,4 @@
-use crate::{Context, Error};
+use crate::{commands::embeds::error_embed, Context, Error};
 
 use fancy_regex::Regex;
 use regex::Regex as Regex_Classic;
@@ -14,13 +14,17 @@ use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
 use songbird::events::TrackEvent;
 
-use crate::commands::music::misc::TrackErrorNotifier;
+use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::http::HttpKey;
 
+/// Plays a song; \
+/// you can search by query or paste an url; \
+/// aliases: play, p, enqueue
 #[poise::command(
     prefix_command, 
     slash_command, 
-    aliases("p", "enqueue")
+    aliases("p", "enqueue"),
+    category = "Music"
 )]
 pub async fn play(
     ctx: Context<'_>, 
@@ -39,8 +43,11 @@ pub async fn play(
 
     let connect_to = match channel_id {
         Some(channel) => channel,
-        None => {
-            ctx.say("Not in a voice channel").await?;
+        None => { 
+            let msg = "I am not in a voice channel!";
+            ctx.send(
+                CreateReply::default().embed(error_embed(ctx, msg).await.unwrap())
+            ).await?;
 
             return Ok(());
         }

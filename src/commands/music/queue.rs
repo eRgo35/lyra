@@ -1,9 +1,19 @@
-use crate::{Context, Error};
+use crate::{commands::embeds::error_embed, Context, Error};
+use poise::CreateReply;
 
-#[poise::command(prefix_command, slash_command)]
-pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
+/// Shows next tracks in queue; \
+/// aliases: queue, q
+#[poise::command(
+    prefix_command, 
+    slash_command,
+    aliases("q"),
+    category = "Music" 
+)]
+pub async fn queue(
+    ctx: Context<'_>
+) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
-    
+
     let manager = songbird::get(&ctx.serenity_context())
         .await
         .expect("Songbird client placed at init")
@@ -21,13 +31,16 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
                 song.uuid(),
                 "Artist"
                 // song.metadata().artist.clone().unwrap_or_else(|| String::from("Unknown"))
-        ));
+            ));
         }
-        
+
         ctx.say(queue_res).await?;
 
     } else {
-        ctx.say("Not in a voice channel!").await?;
+        let msg = "I am not in a voice channel!";
+        ctx.send(
+            CreateReply::default().embed(error_embed(ctx, msg).await.unwrap())
+        ).await?;
     }
 
     Ok(())

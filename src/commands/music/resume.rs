@@ -1,7 +1,15 @@
-use crate::{Context, Error};
+use crate::{commands::embeds::{error_embed, embed}, Context, Error};
+use poise::CreateReply;
 
-#[poise::command(prefix_command, slash_command)]
-pub async fn resume(ctx: Context<'_>) -> Result<(), Error> {
+/// Resumes currently paused song
+#[poise::command(
+    prefix_command,
+    slash_command,
+    category = "Music"
+)]
+pub async fn resume(
+    ctx: Context<'_>
+) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
     let manager = songbird::get(&ctx.serenity_context())
@@ -15,8 +23,14 @@ pub async fn resume(ctx: Context<'_>) -> Result<(), Error> {
         let _ = queue.resume();
 
         ctx.say(format!("Song resumed.")).await?;
+        ctx.send(
+            CreateReply::default().embed(embed(ctx, "Resumed!", "Currently paused song is now resumed!", "").await.unwrap())
+        ).await?;
     } else {
-        ctx.say("Not in a voice channel to play in").await?;
+        let msg = "I am not in a voice channel!";
+        ctx.send(
+            CreateReply::default().embed(error_embed(ctx, msg).await.unwrap())
+        ).await?;
     }
 
     Ok(())

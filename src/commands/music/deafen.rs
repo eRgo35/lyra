@@ -1,7 +1,17 @@
-use crate::{Context, Error};
+use crate::{commands::embeds::{error_embed, embed, fail}, Context, Error};
+use poise::CreateReply;
 
-#[poise::command(prefix_command, slash_command)]
-pub async fn deafen(ctx: Context<'_>) -> Result<(), Error> {
+/// Deafens itself while in a voice channel; \
+/// aliases: deafen, undeaden, shuush
+#[poise::command(
+    prefix_command,
+    slash_command,
+    aliases("shuush", "undeafen"),
+    category = "Music"
+)]
+pub async fn deafen(
+    ctx: Context<'_>
+) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
     let manager = songbird::get(&ctx.serenity_context())
@@ -12,8 +22,11 @@ pub async fn deafen(ctx: Context<'_>) -> Result<(), Error> {
     let handler_lock = match manager.get(guild_id) {
         Some(handler) => handler,
         None => {
-            ctx.say("Not in a voice channel").await?;
-
+            let msg = "I am not in a voice channel!";
+            ctx.send(
+                CreateReply::default().embed(error_embed(ctx, msg).await.unwrap())
+            ).await?;
+            
             return Ok(());
         }
     };
@@ -22,16 +35,20 @@ pub async fn deafen(ctx: Context<'_>) -> Result<(), Error> {
 
     if handler.is_deaf() {
         if let Err(err) = handler.deafen(false).await {
-            ctx.say(format!("Failed: {:?}", err)).await?;
+            fail(ctx, err.to_string()).await.unwrap();
         }
 
-        ctx.say("Undeafened").await?;
+        ctx.send(
+            CreateReply::default().embed(embed(ctx, "Undeafened!", "", "").await.unwrap())
+        ).await?;
     } else {
-        if let Err(err) = handler.deafen(true).await {
-            ctx.say(format!("Failed: {:?}", err)).await?;
+        if let Err(err) = handler.deafen(true).await {  
+            fail(ctx, err.to_string()).await.unwrap();
         }
-
-        ctx.say("Deafened").await?;
+       
+        ctx.send(
+            CreateReply::default().embed(embed(ctx, "Deafened!", "", "").await.unwrap())
+        ).await?;
     }
 
     Ok(())
