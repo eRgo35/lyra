@@ -56,6 +56,7 @@ async fn main() {
         tools::ping(),
         tools::register(),
         tools::help(),
+        tools::posix(),
     ];
 
     let options = poise::FrameworkOptions {

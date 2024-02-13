@@ -1,7 +1,9 @@
 use crate::{commands::embeds::error_embed, Context, Error};
+use crate::commands::music::metadata::Metadata;
 
 use fancy_regex::Regex;
 use regex::Regex as Regex_Classic;
+use songbird::tracks::{TrackHandle, TrackQueue};
 use std::process::Command;
 use std::time::Duration;
 use poise::CreateReply;
@@ -81,17 +83,19 @@ pub async fn play(
 
             let urls: Vec<String> = regex_youtube.captures_iter(&list).map(|capture| capture[1].to_string()).collect();
             
-            let mut sources: Vec<YoutubeDl> = vec![];
+            for (index, url) in urls.clone().iter().enumerate() { 
+                let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), url.to_string());
+                let aux_metadata = src.clone().aux_metadata().await.unwrap();
+                let track = handler.enqueue_input(src.clone().into()).await;
+                let _ = track.typemap().write().await.insert::<Metadata>(aux_metadata);
 
-            for url in urls {
-                let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), url);
-                let _ = handler.enqueue_input(src.clone().into()).await;
-                sources.push(src);
+                if index == 0 {
+                    let embed = generate_playlist_embed(ctx, track, urls.len()).await;
+                    let response = CreateReply::default().embed(embed.unwrap());
+                    ctx.send(response).await?;
+                }
             }
-
-            let embed = generate_playlist_embed(ctx, sources).await;
-            let response = CreateReply::default().embed(embed.unwrap());
-            ctx.send(response).await?;
+            
         } else {
             if is_spotify {
                 let exec = format!("node ./src/spotify --url {}", song);
@@ -106,23 +110,31 @@ pub async fn play(
             }
 
             let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, song); 
-            let _ = handler.enqueue_input(src.clone().into()).await;
-        
-            let embed = generate_embed(ctx, src).await;
+            let embed = generate_embed(ctx, src.clone(), handler.queue()).await;
             let response = CreateReply::default().embed(embed.unwrap());
             ctx.send(response).await?;
+            
+            let aux_metadata = src.clone().aux_metadata().await.unwrap();
+        
+            let track = handler.enqueue_input(src.clone().into()).await;
+            let _ = track.typemap().write().await.insert::<Metadata>(aux_metadata);
         }
     }
 
     Ok(())
 }
 
-async fn generate_embed(ctx: Context<'_>, src: YoutubeDl) -> Result<CreateEmbed, Error> {
+async fn generate_embed(ctx: Context<'_>, src: YoutubeDl, queue: &TrackQueue) -> Result<CreateEmbed, Error> {
     let metadata = src.clone().aux_metadata().await.unwrap();
     let AuxMetadata {title, thumbnail, source_url, artist, duration, ..} = metadata;
     let timestamp = Timestamp::now();
     let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
     let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
+    let mut description = format!("Song added to queue @ {}", queue.len());
+    
+    if queue.len() == 0 {
+        description = format!("Playing now!");
+    }
 
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Track enqueued").icon_url(ctx.author().clone().face()))
@@ -133,30 +145,30 @@ async fn generate_embed(ctx: Context<'_>, src: YoutubeDl) -> Result<CreateEmbed,
         .field("Artist", artist.unwrap_or("Unknown Artist".to_string()), true)
         .field("Duration", format!("{:02}:{:02}", duration_minutes, duration_seconds), true)
         .field("DJ", ctx.author().name.clone(), true)
+        .description(description)
         .timestamp(timestamp)
         .footer(CreateEmbedFooter::new(ctx.cache().current_user().name.to_string()).icon_url(ctx.cache().current_user().face()));
 
     Ok(embed)
 }
 
-async fn generate_playlist_embed(ctx: Context<'_>, sources: Vec<YoutubeDl>) -> Result<CreateEmbed, Error> {
-    let src = sources.get(0).unwrap();
-    
-    let metadata = src.clone().aux_metadata().await.unwrap();
+async fn generate_playlist_embed(ctx: Context<'_>, track: TrackHandle, queue_length: usize) -> Result<CreateEmbed, Error> {
+    let meta_typemap = track.typemap().read().await;
+    let metadata = meta_typemap.get::<Metadata>().unwrap(); 
     let AuxMetadata {title, thumbnail, source_url, artist, duration, ..} = metadata;
     let timestamp = Timestamp::now();
     let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
     let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
     
-    let description = format!("Enqueued tracks: {}", sources.len() - 1);
+    let description = format!("Enqueued tracks: {}", queue_length - 1);
 
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Playlist enqueued").icon_url(ctx.author().clone().face()))
         .colour(Colour::from_rgb(255, 58, 97))
-        .title(title.unwrap())
-        .url(source_url.unwrap())
-        .thumbnail(thumbnail.unwrap_or(ctx.cache().current_user().face()))
-        .field("Artist", artist.unwrap_or("Unknown Artist".to_string()), true)
+        .title(title.as_ref().unwrap())
+        .url(source_url.as_ref().unwrap())
+        .thumbnail(thumbnail.as_ref().unwrap_or(&ctx.cache().current_user().face()))
+        .field("Artist", artist.as_ref().unwrap_or(&"Unknown Artist".to_string()), true)
         .field("Duration", format!("{:02}:{:02}", duration_minutes, duration_seconds), true)
         .field("DJ", ctx.author().name.clone(), true)
         .description(description)
