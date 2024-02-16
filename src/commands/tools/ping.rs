@@ -2,17 +2,12 @@ use crate::{Context, Error};
 use std::time::SystemTime;
 
 /// Pings you backs with a response time
-#[poise::command(
-    prefix_command,
-    slash_command,
-    category = "Tools"
-)]
-pub async fn ping(
-    ctx: Context<'_>
-) -> Result<(), Error> {
+#[poise::command(prefix_command, slash_command, category = "Tools")]
+pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     let system_now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap().as_millis() as i64;
+        .unwrap()
+        .as_millis() as i64;
 
     let message_now = ctx.created_at().timestamp_millis();
 

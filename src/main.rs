@@ -1,9 +1,9 @@
+use poise::serenity_prelude::{self as serenity, ActivityData};
+use reqwest::Client as HttpClient;
+use songbird::SerenityInit;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn, error};
-use poise::serenity_prelude::{self as serenity, ActivityData};
-use songbird::SerenityInit;
-use reqwest::Client as HttpClient;
+use tracing::{error, info, warn};
 
 mod commands;
 mod http;
@@ -37,7 +37,8 @@ async fn main() {
     tracing_subscriber::fmt::init();
     dotenv::dotenv().expect("Failed to load .env file.");
 
-    let token = std::env::var("DISCORD_TOKEN").expect("Environment variable `DISCORD_TOKEN` not found!");
+    let token =
+        std::env::var("DISCORD_TOKEN").expect("Environment variable `DISCORD_TOKEN` not found!");
     let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
 
     let commands = vec![
@@ -45,18 +46,33 @@ async fn main() {
         music::deafen(),
         music::join(),
         music::leave(),
-        music::repeat(),
         music::mute(),
         music::pause(),
         music::play(),
         music::queue(),
+        music::repeat(),
         music::resume(),
+        music::seek(),
+        music::shuffle(),
         music::skip(),
+        music::soundboard(),
         music::stop(),
-        tools::ping(),
-        tools::register(),
+        music::volume(),
+        tools::ai(),
+        tools::dice(),
+        tools::dictionary(),
         tools::help(),
+        tools::ip(),
+        tools::metar(),
+        tools::owoify(),
+        tools::ping(),
         tools::posix(),
+        tools::qr(),
+        tools::register(),
+        tools::taf(),
+        tools::uptime(),
+        tools::verse(),
+        tools::weather(),
     ];
 
     let options = poise::FrameworkOptions {
@@ -96,7 +112,10 @@ async fn main() {
         skip_checks_for_owners: false,
         event_handler: |_ctx, event, _framework, _data| {
             Box::pin(async move {
-                info!("Got an event in event handler: {:?}", event.snake_case_name());
+                info!(
+                    "Got an event in event handler: {:?}",
+                    event.snake_case_name()
+                );
                 Ok(())
             })
         },
@@ -106,7 +125,10 @@ async fn main() {
     let framework = poise::Framework::builder()
         .setup(move |ctx, ready, _framework| {
             Box::pin(async move {
-                info!("{} [{}] connected successfully!", ready.user.name, ready.user.id);
+                info!(
+                    "{} [{}] connected successfully!",
+                    ready.user.name, ready.user.id
+                );
                 ctx.set_activity(Some(ActivityData::listening(prefix + "help")));
                 // poise::builtins::register_globally(ctx, &framework.options().commands).await?;
 
@@ -116,7 +138,8 @@ async fn main() {
         .options(options)
         .build();
 
-    let intents = serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
+    let intents =
+        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)

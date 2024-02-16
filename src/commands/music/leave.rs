@@ -1,5 +1,8 @@
+use crate::{
+    commands::embeds::{embed, error_embed, fail},
+    Context, Error,
+};
 use poise::CreateReply;
-use crate::{commands::embeds::{error_embed, fail, embed}, Context, Error};
 
 /// Leaves the voice channel; \
 /// aliases: leave, qa!
@@ -9,9 +12,7 @@ use crate::{commands::embeds::{error_embed, fail, embed}, Context, Error};
     aliases("leave", "qa!"),
     category = "Music"
 )]
-pub async fn leave(
-    ctx: Context<'_>
-) -> Result<(), Error> {
+pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
     let manager = songbird::get(&ctx.serenity_context())
@@ -21,20 +22,24 @@ pub async fn leave(
 
     if !manager.get(guild_id).is_some() {
         let msg = "I am not in a voice channel!";
-        ctx.send(
-            CreateReply::default().embed(error_embed(ctx, msg).await.unwrap())
-        ).await?;
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+            .await?;
 
-        return Ok(())
+        return Ok(());
     }
 
-    if let Err(err) = manager.remove(guild_id).await { 
+    if let Err(err) = manager.remove(guild_id).await {
         fail(ctx, err.to_string()).await.unwrap();
     }
 
     ctx.send(
-        CreateReply::default().embed(embed(ctx, "Left!", "I left the voice channel", "").await.unwrap())
-    ).await?;
+        CreateReply::default().embed(
+            embed(ctx, "Left!", "I left the voice channel", "")
+                .await
+                .unwrap(),
+        ),
+    )
+    .await?;
 
     Ok(())
 }
