@@ -28,6 +28,5 @@ pub use resume::resume;
 pub use seek::seek;
 pub use shuffle::shuffle;
 pub use skip::skip;
-pub use soundboard::soundboard;
 pub use stop::stop;
 pub use volume::volume;

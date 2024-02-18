@@ -1,11 +1,5 @@
-use crate::{commands::embeds::embed, Context, Error};
-use poise::CreateReply;
+pub mod effect;
+pub mod stream;
 
-/// A better soundboard
-#[poise::command(prefix_command, slash_command, category = "Music")]
-pub async fn soundboard(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.send(CreateReply::default().embed(embed(ctx, "", "", "").await.unwrap()))
-        .await?;
-
-    Ok(())
-}
+pub use effect::effect;
+pub use stream::stream;
