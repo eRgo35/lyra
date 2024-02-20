@@ -10,6 +10,8 @@ use serenity::{
 };
 use songbird::input::AuxMetadata;
 
+const QUEUE_DISPLAY_LENGTH: usize = 10;
+
 /// Shows next tracks in queue; \
 /// aliases: queue, q
 #[poise::command(prefix_command, slash_command, aliases("q"), category = "Music")]
@@ -25,8 +27,9 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
         let mut queue_res = String::from("");
+        let mut too_long = false;
 
-        for (index, song) in queue.current_queue().iter().enumerate() {
+        for (index, song) in queue.clone().current_queue().iter().enumerate() {
             let meta_typemap = song.typemap().read().await;
             let metadata = meta_typemap.get::<Metadata>().unwrap();
             let AuxMetadata {
@@ -39,8 +42,6 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
             let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
             let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
 
-            // println!("{:?}", metadata.clone());
-
             queue_res.push_str(&format!(
                 "{}. {} - {} [{:02}:{:02}] \n",
                 index,
@@ -48,6 +49,17 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
                 artist.as_ref().unwrap(),
                 duration_minutes,
                 duration_seconds
+            ));
+
+            if index + 1 == QUEUE_DISPLAY_LENGTH {
+                too_long = true;
+                break;
+            }
+        }
+        if too_long {
+            queue_res.push_str(&format!(
+                "and {} more...",
+                queue.len() - QUEUE_DISPLAY_LENGTH
             ));
         }
 

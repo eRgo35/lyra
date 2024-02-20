@@ -42,9 +42,12 @@ pub async fn play(
         r"^((?:https?:)\/\/)?((?:www|m)\.)?((?:youtube\.com)).*(youtu.be\/|list=)([^#&?]*).*",
     )
     .unwrap();
+    let regex_spotify_playlist = Regex::new(r"https?:\/\/(?:embed\.|open\.)(?:spotify\.com\/)(?:(album|playlist)\/|\?uri=spotify:playlist:)((\w|-)+)(?:(?=\?)(?:[?&]foo=(\d*)(?=[&#]|$)|(?![?&]foo=)[^#])+)?(?=#|$)").unwrap();
 
-    let is_playlist = regex_youtube_playlist.is_match(&song).unwrap();
-    let is_spotify = regex_spotify.is_match(&song).unwrap();
+    let is_playlist = regex_youtube_playlist.is_match(&song).unwrap()
+        || regex_spotify_playlist.is_match(&song).unwrap();
+    let is_spotify =
+        regex_spotify.is_match(&song).unwrap() || regex_spotify_playlist.is_match(&song).unwrap();
     let is_query = !song.starts_with("http");
 
     let guild_id = ctx.guild_id().unwrap();
@@ -83,6 +86,43 @@ pub async fn play(
 
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
+        if is_playlist && is_spotify {
+            let raw_list = Command::new("node")
+                .args(["./src/spotify-parser", &song])
+                .output()
+                .expect("failed to execute process")
+                .stdout;
+            let list = String::from_utf8(raw_list.clone()).expect("Invalid UTF-8");
+
+            let tracks: Vec<String> = list.split("\n").map(str::to_string).collect();
+
+            for (index, url) in tracks.clone().iter().enumerate() {
+                if url.is_empty() {
+                    break;
+                }
+                let src = YoutubeDl::new_ytdl_like(
+                    "yt-dlp",
+                    http_client.clone(),
+                    format!("ytsearch:{}", url.to_string()),
+                );
+                let aux_metadata = src.clone().aux_metadata().await.unwrap();
+                let track = handler.enqueue_input(src.clone().into()).await;
+                let _ = track
+                    .typemap()
+                    .write()
+                    .await
+                    .insert::<Metadata>(aux_metadata);
+
+                if index == 0 {
+                    let embed = generate_playlist_embed(ctx, track, tracks.len()).await;
+                    let response = CreateReply::default().embed(embed.unwrap());
+                    ctx.send(response).await?;
+                }
+            }
+
+            return Ok(());
+        }
+
         if is_playlist {
             let raw_list = Command::new("yt-dlp")
                 .args(["-j", "--flat-playlist", &song])
@@ -98,6 +138,9 @@ pub async fn play(
                 .collect();
 
             for (index, url) in urls.clone().iter().enumerate() {
+                if url.is_empty() {
+                    break;
+                }
                 let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), url.to_string());
                 let aux_metadata = src.clone().aux_metadata().await.unwrap();
                 let track = handler.enqueue_input(src.clone().into()).await;
@@ -113,37 +156,37 @@ pub async fn play(
                     ctx.send(response).await?;
                 }
             }
-        } else {
-            if is_spotify {
-                let exec = format!("node ./src/spotify --url {}", song);
-                let query = Command::new("sh")
-                    .arg("-c")
-                    .arg(exec)
-                    .output()
-                    .expect("failed to execute process")
-                    .stdout;
-                let query_str = String::from_utf8(query.clone()).expect("Invalid UTF-8");
-                song = format!("ytsearch:{}", query_str.to_string());
-            }
 
-            if is_query {
-                song = format!("ytsearch:{}", song);
-            }
-
-            let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, song);
-            let embed = generate_embed(ctx, src.clone(), handler.queue()).await;
-            let response = CreateReply::default().embed(embed.unwrap());
-            ctx.send(response).await?;
-
-            let aux_metadata = src.clone().aux_metadata().await.unwrap();
-
-            let track = handler.enqueue_input(src.clone().into()).await;
-            let _ = track
-                .typemap()
-                .write()
-                .await
-                .insert::<Metadata>(aux_metadata);
+            return Ok(());
         }
+
+        if is_spotify {
+            let query = Command::new("node")
+                .args(["./src/spotify-parser", &song])
+                .output()
+                .expect("failed to execute process")
+                .stdout;
+            let query_str = String::from_utf8(query.clone()).expect("Invalid UTF-8");
+            song = format!("ytsearch:{}", query_str.to_string());
+        }
+
+        if is_query {
+            song = format!("ytsearch:{}", song);
+        }
+
+        let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, song);
+        let embed = generate_embed(ctx, src.clone(), handler.queue()).await;
+        let response = CreateReply::default().embed(embed.unwrap());
+        ctx.send(response).await?;
+
+        let aux_metadata = src.clone().aux_metadata().await.unwrap();
+
+        let track = handler.enqueue_input(src.clone().into()).await;
+        let _ = track
+            .typemap()
+            .write()
+            .await
+            .insert::<Metadata>(aux_metadata);
     }
 
     Ok(())
@@ -166,7 +209,7 @@ async fn generate_embed(
     let timestamp = Timestamp::now();
     let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
     let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
-    let mut description = format!("Song added to queue @ {}", queue.len());
+    let mut description = format!("Song added to queue @ {}", queue.len() + 1);
 
     if queue.len() == 0 {
         description = format!("Playing now!");
