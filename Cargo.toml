@@ -1,6 +1,6 @@
 [package]
 name = "lyra"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Michał Czyż <mike@c2yz.com>"]
 edition = "2021"
 description = "A featureful Discord bot written in Rust."
@@ -16,6 +16,7 @@ dotenv = "0.15.0"
 fancy-regex = "0.13.0"
 json = "0.12.4"
 openssl = { version = "0.10.63", features = ["vendored"] }
+owoify = "0.1.5"
 poise = "0.6.1"
 rand = "0.8.5"
 regex = "1.10.3"

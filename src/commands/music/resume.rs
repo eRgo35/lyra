@@ -19,7 +19,6 @@ pub async fn resume(ctx: Context<'_>) -> Result<(), Error> {
         let queue = handler.queue();
         let _ = queue.resume();
 
-        ctx.say(format!("Song resumed.")).await?;
         ctx.send(
             CreateReply::default().embed(
                 embed(ctx, "Resumed!", "Currently paused song is now resumed!", "")

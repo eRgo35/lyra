@@ -53,7 +53,6 @@ async fn main() {
         music::repeat(),
         music::resume(),
         music::seek(),
-        music::shuffle(),
         music::skip(),
         music::stop(),
         music::volume(),
