@@ -1,6 +1,6 @@
 [package]
 name = "lyra"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Michał Czyż <mike@c2yz.com>"]
 edition = "2021"
 description = "A featureful Discord bot written in Rust."
