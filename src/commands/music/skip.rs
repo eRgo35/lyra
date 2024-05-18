@@ -12,8 +12,14 @@ use serenity::{
 };
 use songbird::{input::AuxMetadata, tracks::TrackHandle};
 
-/// Skips the currently playing song
-#[poise::command(prefix_command, slash_command, category = "Music")]
+/// Skips the currently playing song; \
+/// aliases: skip, :skipper:
+#[poise::command(
+    prefix_command, 
+    slash_command, 
+    aliases("skipper:"),
+    category = "Music"
+)]
 pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
