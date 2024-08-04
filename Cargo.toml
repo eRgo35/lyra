@@ -1,6 +1,6 @@
 [package]
 name = "lyra"
-version = "0.8.2"
+version = "0.9.0"
 authors = ["Michał Czyż <mike@c2yz.com>"]
 edition = "2021"
 description = "A featureful Discord bot written in Rust."
@@ -12,6 +12,7 @@ keywords = ["discord", "bot", "rust", "music", "featureful"]
 
 
 [dependencies]
+lib-spotify-parser = { path = "libs/spotify-parser" }
 dotenv = "0.15.0"
 fancy-regex = "0.13.0"
 json = "0.12.4"

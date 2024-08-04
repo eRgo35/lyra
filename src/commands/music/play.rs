@@ -2,6 +2,7 @@ use crate::commands::music::metadata::Metadata;
 use crate::{commands::embeds::error_embed, Context, Error};
 
 use fancy_regex::Regex;
+use lib_spotify_parser;
 use poise::serenity_prelude::model::Timestamp;
 use poise::serenity_prelude::Colour;
 use poise::serenity_prelude::CreateEmbed;
@@ -87,14 +88,7 @@ pub async fn play(
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
         if is_playlist && is_spotify {
-            let raw_list = Command::new("node")
-                .args(["./src/spotify-parser", &song])
-                .output()
-                .expect("failed to execute process")
-                .stdout;
-            let list = String::from_utf8(raw_list.clone()).expect("Invalid UTF-8");
-
-            let tracks: Vec<String> = list.split("\n").map(str::to_string).collect();
+            let tracks: Vec<String> = lib_spotify_parser::retrieve_async_url(&song).await.unwrap();
 
             for (index, url) in tracks.clone().iter().enumerate() {
                 if url.is_empty() {
@@ -161,13 +155,14 @@ pub async fn play(
         }
 
         if is_spotify {
-            let query = Command::new("node")
-                .args(["./src/spotify-parser", &song])
-                .output()
-                .expect("failed to execute process")
-                .stdout;
-            let query_str = String::from_utf8(query.clone()).expect("Invalid UTF-8");
-            song = format!("ytsearch:{}", query_str.to_string());
+            song = format!(
+                "ytsearch:{}",
+                lib_spotify_parser::retrieve_async_url(&song)
+                    .await
+                    .unwrap()
+                    .first()
+                    .unwrap()
+            );
         }
 
         if is_query {

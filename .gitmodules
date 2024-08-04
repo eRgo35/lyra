@@ -1,3 +1,0 @@
-[submodule "src/spotify-parser"]
-	path = src/spotify-parser
-	url = https://github.com/eRgo35/spotify-parser
