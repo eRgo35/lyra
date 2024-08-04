@@ -35,7 +35,7 @@ pub async fn ai(
         response = rng.gen_range(0..iamsorry.len());
     };
 
-    sleep(Duration::from_secs(3));
+    sleep(Duration::from_secs(1));
 
     ctx.send(
         CreateReply::default().embed(

@@ -1,3 +1,4 @@
+use commands::tools::uptime::PROCESS_UPTIME;
 use poise::serenity_prelude::{self as serenity, ActivityData};
 use reqwest::Client as HttpClient;
 use songbird::SerenityInit;
@@ -37,6 +38,8 @@ async fn main() {
     tracing_subscriber::fmt::init();
     dotenv::dotenv().expect("Failed to load .env file.");
 
+    let _ = PROCESS_UPTIME.lock().unwrap().clone();
+
     let token =
         std::env::var("DISCORD_TOKEN").expect("Environment variable `DISCORD_TOKEN` not found!");
     let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
@@ -70,7 +73,7 @@ async fn main() {
         tools::qr(),
         tools::register(),
         tools::taf(),
-        // tools::uptime(),
+        tools::uptime(),
         tools::verse(),
         tools::weather(),
     ];
@@ -123,7 +126,7 @@ async fn main() {
     };
 
     let framework = poise::Framework::builder()
-        .setup(move |ctx, ready, _framework| {
+        .setup(move |ctx, ready, framework| {
             Box::pin(async move {
                 info!(
                     "{} [{}] connected successfully!",
@@ -131,6 +134,12 @@ async fn main() {
                 );
                 ctx.set_activity(Some(ActivityData::listening(prefix + "help")));
                 // poise::builtins::register_globally(ctx, &framework.options().commands).await?;
+                poise::builtins::register_in_guild(
+                    ctx,
+                    &framework.options().commands,
+                    512680330495524873.into(),
+                )
+                .await?;
 
                 Ok(Data {})
             })

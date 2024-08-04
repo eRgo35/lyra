@@ -1355,6 +1355,7 @@ dependencies = [
  "fancy-regex",
  "json",
  "lib-spotify-parser",
+ "once_cell",
  "openssl",
  "owoify",
  "poise",

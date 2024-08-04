@@ -10,7 +10,7 @@ pub mod posix;
 pub mod qr;
 pub mod register;
 pub mod taf;
-// pub mod uptime;
+pub mod uptime;
 pub mod verse;
 pub mod weather;
 
@@ -26,6 +26,6 @@ pub use posix::posix;
 pub use qr::qr;
 pub use register::register;
 pub use taf::taf;
-// pub use uptime::uptime;
+pub use uptime::uptime;
 pub use verse::verse;
 pub use weather::weather;
