@@ -1,0 +1,3 @@
+[submodule "libs/songbird"]
+	path = libs/songbird
+	url = git@github.com:eRgo35/songbird.git
