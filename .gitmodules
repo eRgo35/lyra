@@ -1,3 +1,6 @@
 [submodule "libs/songbird"]
 	path = libs/songbird
 	url = git@github.com:eRgo35/songbird.git
+[submodule "libs/serenity"]
+	path = libs/serenity
+	url = git@github.com:eRgo35/serenity.git
