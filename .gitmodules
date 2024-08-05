@@ -4,3 +4,6 @@
 [submodule "libs/serenity"]
 	path = libs/serenity
 	url = git@github.com:eRgo35/serenity.git
+[submodule "libs/poise"]
+	path = libs/poise
+	url = git@github.com:eRgo35/poise.git

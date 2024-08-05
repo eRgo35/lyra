@@ -5,21 +5,15 @@ use crate::{
     commands::embeds::{embed, error_embed},
     Context, Error,
 };
-use poise::CreateReply;
-use serenity::{
-    builder::{CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter},
-    model::{Colour, Timestamp},
+use poise::serenity_prelude::{
+    Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
+use poise::CreateReply;
 use songbird::{input::AuxMetadata, tracks::TrackHandle};
 
 /// Skips the currently playing song; \
 /// aliases: skip, :skipper:
-#[poise::command(
-    prefix_command, 
-    slash_command, 
-    aliases("skipper:"),
-    category = "Music"
-)]
+#[poise::command(prefix_command, slash_command, aliases("skipper:"), category = "Music")]
 pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
@@ -88,7 +82,7 @@ async fn generate_embed(
 
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Skipped!").icon_url(ctx.author().clone().face()))
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title(title.as_ref().unwrap())
         .url(source_url.as_ref().unwrap())
         .thumbnail(

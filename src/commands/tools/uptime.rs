@@ -10,7 +10,7 @@ pub static PROCESS_UPTIME: Lazy<Mutex<std::time::SystemTime>> =
 /// Checks how long the bot has been running
 #[poise::command(prefix_command, slash_command, category = "Tools")]
 pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
-    let start = PROCESS_UPTIME.lock().unwrap().clone();
+    let start = *PROCESS_UPTIME.lock().unwrap();
     let uptime = std::time::SystemTime::now().duration_since(start).unwrap();
 
     let (days, hours, minutes, seconds) = (

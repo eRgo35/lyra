@@ -1,11 +1,9 @@
 use crate::{commands::embeds::error_embed, Context, Error};
 
-use poise::serenity_prelude::model::Timestamp;
-use poise::serenity_prelude::Colour;
-use poise::serenity_prelude::CreateEmbed;
+use poise::serenity_prelude::{
+    Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
+};
 use poise::CreateReply;
-use serenity::builder::CreateEmbedAuthor;
-use serenity::builder::CreateEmbedFooter;
 use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
@@ -100,7 +98,7 @@ async fn generate_embed(ctx: Context<'_>, src: YoutubeDl) -> Result<CreateEmbed,
         .author(
             CreateEmbedAuthor::new("Audio output hijacked!").icon_url(ctx.author().clone().face()),
         )
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title(title.unwrap())
         .url(source_url.unwrap())
         .thumbnail(thumbnail.unwrap_or(ctx.cache().current_user().face()))

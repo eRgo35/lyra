@@ -38,7 +38,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
     dotenv::dotenv().expect("Failed to load .env file.");
 
-    let _ = PROCESS_UPTIME.lock().unwrap().clone();
+    let _ = *PROCESS_UPTIME.lock().unwrap();
 
     let token =
         std::env::var("DISCORD_TOKEN").expect("Environment variable `DISCORD_TOKEN` not found!");
@@ -81,7 +81,7 @@ async fn main() {
     let options = poise::FrameworkOptions {
         commands,
         prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some(prefix.to_string().into()),
+            prefix: Some(prefix.to_string()),
             edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
                 Duration::from_secs(3600),
             ))),

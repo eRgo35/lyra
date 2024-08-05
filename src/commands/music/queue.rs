@@ -2,12 +2,10 @@ use std::time::Duration;
 
 use crate::commands::music::metadata::Metadata;
 use crate::{commands::embeds::error_embed, Context, Error};
-use poise::serenity_prelude::CreateEmbed;
-use poise::CreateReply;
-use serenity::{
-    builder::{CreateEmbedAuthor, CreateEmbedFooter},
-    model::{Colour, Timestamp},
+use poise::serenity_prelude::{
+    Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
+use poise::CreateReply;
 use songbird::input::AuxMetadata;
 
 const QUEUE_DISPLAY_LENGTH: usize = 10;
@@ -80,7 +78,7 @@ async fn embed(ctx: Context<'_>, queue: String) -> Result<CreateEmbed, Error> {
 
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Queue").icon_url(ctx.author().clone().face()))
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title(title)
         .description(queue)
         .timestamp(timestamp)

@@ -3,13 +3,11 @@ use crate::{commands::embeds::error_embed, Context, Error};
 
 use fancy_regex::Regex;
 use lib_spotify_parser;
-use poise::serenity_prelude::model::Timestamp;
-use poise::serenity_prelude::Colour;
-use poise::serenity_prelude::CreateEmbed;
+use poise::serenity_prelude::{
+    Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
+};
 use poise::CreateReply;
 use regex::Regex as Regex_Classic;
-use serenity::builder::CreateEmbedAuthor;
-use serenity::builder::CreateEmbedFooter;
 use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
@@ -212,7 +210,7 @@ async fn generate_embed(
 
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Track enqueued").icon_url(ctx.author().clone().face()))
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title(title.unwrap())
         .url(source_url.unwrap())
         .thumbnail(thumbnail.unwrap_or(ctx.cache().current_user().face()))
@@ -260,7 +258,7 @@ async fn generate_playlist_embed(
 
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Playlist enqueued").icon_url(ctx.author().clone().face()))
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title(title.as_ref().unwrap())
         .url(source_url.as_ref().unwrap())
         .thumbnail(

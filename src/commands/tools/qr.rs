@@ -1,8 +1,7 @@
-use poise::CreateReply;
-use serenity::{
-    builder::{CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter},
-    model::{Colour, Timestamp},
+use poise::serenity_prelude::{
+    Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
+use poise::CreateReply;
 
 use crate::{Context, Error};
 use url::form_urlencoded;
@@ -34,7 +33,7 @@ async fn generate_embed(ctx: Context<'_>, message: String) -> Result<CreateEmbed
             CreateEmbedAuthor::new("Your message as a QR Code!")
                 .icon_url(ctx.author().clone().face()),
         )
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title("Your QR Code:")
         .url(url.clone())
         .image(url)

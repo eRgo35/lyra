@@ -1,11 +1,9 @@
 use crate::{Context, Error};
 
-use poise::serenity_prelude::CreateEmbed;
-use poise::CreateReply;
-use serenity::{
-    builder::{CreateEmbedAuthor, CreateEmbedFooter},
-    model::{Colour, Timestamp},
+use poise::serenity_prelude::{
+    Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
+use poise::CreateReply;
 
 pub async fn fail(ctx: Context<'_>, err: String) -> Result<(), Error> {
     ctx.send(
@@ -25,7 +23,7 @@ pub async fn error_embed(ctx: Context<'_>, msg: &str) -> Result<CreateEmbed, Err
         .author(
             CreateEmbedAuthor::new("Something went wrong!").icon_url(ctx.author().clone().face()),
         )
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title("Oopsie, Doopsie!")
         .description(msg)
         .timestamp(Timestamp::now())
@@ -45,7 +43,7 @@ pub async fn embed(
 ) -> Result<CreateEmbed, Error> {
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new(author).icon_url(ctx.author().clone().face()))
-        .colour(Colour::from_rgb(255, 58, 97))
+        .colour(Color::from_rgb(255, 58, 97))
         .title(title)
         .description(description)
         .timestamp(Timestamp::now())
