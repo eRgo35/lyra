@@ -7,3 +7,6 @@
 [submodule "libs/poise"]
 	path = libs/poise
 	url = git@github.com:eRgo35/poise.git
+[submodule "libs/spotify-parser"]
+	path = libs/spotify-parser
+	url = git@github.com:eRgo35/spotify-parser.git
