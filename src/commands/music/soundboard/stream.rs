@@ -41,7 +41,7 @@ pub async fn stream(
             .expect("Guaranteed to exist in the typemap.")
     };
 
-    let manager = songbird::get(&ctx.serenity_context())
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird Voice placed at init")
         .clone();
@@ -92,7 +92,7 @@ async fn generate_embed(ctx: Context<'_>, src: YoutubeDl) -> Result<CreateEmbed,
     let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
     let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
 
-    let description = format!("Playing now!");
+    let description = "Playing now!";
 
     let embed = CreateEmbed::default()
         .author(

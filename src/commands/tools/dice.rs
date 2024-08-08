@@ -7,12 +7,9 @@ use crate::{commands::embeds::embed, Context, Error};
 /// Rolls a dice
 #[poise::command(prefix_command, slash_command, category = "Tools")]
 pub async fn dice(ctx: Context<'_>) -> Result<(), Error> {
-    let dice;
-
-    let _ = {
+    let dice = {
         let mut rng = rand::thread_rng();
-
-        dice = rng.gen_range(1..7);
+        rng.gen_range(1..=6)
     };
 
     ctx.send(

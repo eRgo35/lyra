@@ -15,7 +15,7 @@ pub async fn ai(
     #[rest]
     prompt: String,
 ) -> Result<(), Error> {
-    let iamsorry = vec![
+    let iamsorry = &[
         "I'm sorry, but as an AI language model, I must follow ethical guidelines, and I cannot engage in harmful, malicious, or offensive behavior.",
         "I'm sorry, but as an AI language model, I may not always be perfect and can make mistakes or provide inaccurate information. Please verify important details from reliable sources.",
         "I'm sorry, but as an AI language model, I can't engage in real-time conversations or remember previous interactions with users.",
@@ -27,19 +27,17 @@ pub async fn ai(
 
     println!("Funny prompts: {}", prompt);
 
-    let response;
-
-    let _ = {
+    let response = {
         let mut rng = rand::thread_rng();
 
-        response = rng.gen_range(0..iamsorry.len());
+        rng.gen_range(0..iamsorry.len())
     };
 
     sleep(Duration::from_secs(1));
 
     ctx.send(
         CreateReply::default().embed(
-            embed(ctx, "AI Response:", "", &format!("{}", iamsorry[response]))
+            embed(ctx, "AI Response:", "", iamsorry[response])
                 .await
                 .unwrap(),
         ),

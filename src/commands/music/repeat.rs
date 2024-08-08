@@ -21,7 +21,7 @@ pub async fn repeat(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(&ctx.serenity_context())
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird client placed at init")
         .clone();

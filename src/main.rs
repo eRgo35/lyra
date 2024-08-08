@@ -9,7 +9,6 @@ use tracing::{error, info, warn};
 mod commands;
 mod http;
 
-use crate::commands::kashi;
 use crate::commands::music;
 use crate::commands::tools;
 use crate::http::HttpKey;
@@ -17,7 +16,9 @@ use crate::http::HttpKey;
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
-pub struct Data;
+pub struct Data {
+    pub http_client: HttpClient,
+}
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
     match error {
@@ -45,7 +46,6 @@ async fn main() {
     let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
 
     let commands = vec![
-        kashi::kashi(),
         music::deafen(),
         music::join(),
         music::leave(),
@@ -141,7 +141,9 @@ async fn main() {
                 )
                 .await?;
 
-                Ok(Data {})
+                Ok(Data {
+                    http_client: HttpClient::new(),
+                })
             })
         })
         .options(options)

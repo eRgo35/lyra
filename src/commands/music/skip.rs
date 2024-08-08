@@ -17,7 +17,7 @@ use songbird::{input::AuxMetadata, tracks::TrackHandle};
 pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(&ctx.serenity_context())
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird client placed at init")
         .clone();
@@ -30,23 +30,18 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
         let track = track_raw.get(1);
         let queue_length = queue.len() - 1;
 
-        let response;
+        let mut response = CreateReply::default().embed(
+            embed(ctx, "Skipped!", "The queue is empty!", "")
+                .await
+                .unwrap(),
+        );
 
-        match track {
-            Some(track) => {
-                response = CreateReply::default().embed(
-                    generate_embed(ctx, track.clone(), queue_length)
-                        .await
-                        .unwrap(),
-                );
-            }
-            None => {
-                response = CreateReply::default().embed(
-                    embed(ctx, "Skipped!", "The queue is empty!", "")
-                        .await
-                        .unwrap(),
-                );
-            }
+        if let Some(track) = track {
+            response = CreateReply::default().embed(
+                generate_embed(ctx, track.clone(), queue_length)
+                    .await
+                    .unwrap(),
+            );
         };
 
         ctx.send(response).await?;

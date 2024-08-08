@@ -15,12 +15,12 @@ use poise::CreateReply;
 pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 
-    let manager = songbird::get(&ctx.serenity_context())
+    let manager = songbird::get(ctx.serenity_context())
         .await
         .expect("Songbird client placed at init")
         .clone();
 
-    if !manager.get(guild_id).is_some() {
+    if manager.get(guild_id).is_none() {
         let msg = "I am not in a voice channel!";
         ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
             .await?;
