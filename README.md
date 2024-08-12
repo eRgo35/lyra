@@ -3,7 +3,7 @@
     <img height="256" alt="Lyra" src="assets/lyra-256.png" />
   </a>
   <br />
-  Lyra: a discord music bot written in Rust :crab:
+  Lyra: a discord music bot written in rust :crab:
 </h2>
 
 Lyra is an open source, discord music bot written in Rust.
