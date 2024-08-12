@@ -1,6 +1,6 @@
 <h2 align="center">
   <a href="https://lyra.c2yz.com" target="blank_">
-    <img height="100" alt="Lyra" src="assets/lyra-256.png" />
+    <img height="256" alt="Lyra" src="assets/lyra-256.png" />
   </a>
   <br />
   Lyra: a discord music bot written in Rust :crab:
