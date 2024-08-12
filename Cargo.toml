@@ -11,7 +11,7 @@ license-file = "LICENSE.md"
 keywords = ["discord", "bot", "rust", "music", "featureful"]
 
 [dependencies]
-lib-spotify-parser = { path = "./libs/spotify-parser" }
+spotify-parser = "1.0.1"
 dotenv = "0.15.0"
 json = "0.12.4"
 openssl = { version = "0.10.66", features = ["vendored"] }

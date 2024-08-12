@@ -2,7 +2,6 @@ use crate::commands::music::metadata::Metadata;
 use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::{commands::embeds::error_embed, Context, Error};
 
-use lib_spotify_parser;
 use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
@@ -15,6 +14,7 @@ use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
 use songbird::tracks::TrackQueue;
 use songbird::Call;
+use spotify_parser;
 use std::collections::VecDeque;
 use std::process::Command;
 use std::time::Duration;
@@ -120,7 +120,7 @@ async fn handle_play<'a>(
 }
 
 async fn parse_data(data: String) -> VecDeque<String> {
-    let tracks = lib_spotify_parser::retrieve_async_url(&data)
+    let tracks = spotify_parser::retrieve_async_url(&data)
         .await
         .unwrap_or(vec![data])
         .iter()

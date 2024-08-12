@@ -1267,18 +1267,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db13adb97ab515a3691f56e4dbab09283d0b86cb45abd991d8634a9d6f501760"
 
 [[package]]
-name = "lib-spotify-parser"
-version = "1.0.0"
-dependencies = [
- "regex",
- "reqwest 0.12.5",
- "scraper",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1323,11 +1311,10 @@ dependencies = [
 
 [[package]]
 name = "lyra"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "dotenv",
  "json",
- "lib-spotify-parser",
  "once_cell",
  "openssl",
  "owoify",
@@ -1339,6 +1326,7 @@ dependencies = [
  "serde_json",
  "serenity",
  "songbird",
+ "spotify-parser",
  "symphonia",
  "tokio",
  "tracing",
@@ -2857,6 +2845,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
+]
+
+[[package]]
+name = "spotify-parser"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7b9d1d990125af02c6f611f2e8e34fd979310d43ae7ac5bd2cd357b87b13352"
+dependencies = [
+ "regex",
+ "reqwest 0.12.5",
+ "scraper",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
