@@ -62,6 +62,7 @@ jobs:
 
           - build: linux-aarch64-gnu
             os: ubuntu-latest
+            arch: arm64
             target: aarch64-unknown-linux-gnu
             use-cross: true
 
@@ -84,8 +85,8 @@ jobs:
           command: build
           args: --verbose --release --target ${{ matrix.target }}
 
-      - name: Strip release binary (linux and macos)
-        if: matrix.build == 'linux-gnu' || matrix.build == 'linux-musl' || matrix.build == 'macos' || matrix.build == 'linux-aarch64-gnu'
+      - name: Strip release binary (linux)
+        if: matrix.build == 'linux-gnu' || matrix.build == 'linux-aarch64-gnu'
         run: strip "target/${{ matrix.target }}/release/lyra"
 
       - name: Build archive
