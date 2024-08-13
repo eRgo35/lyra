@@ -10,8 +10,10 @@ pub async fn weather(
     #[rest]
     _location: String,
 ) -> Result<(), Error> {
-    ctx.send(CreateReply::default().embed(embed(ctx, "", "", "").await.unwrap()))
-        .await?;
+    ctx.send(
+        CreateReply::default().embed(embed(ctx, "Weather", "Work in progress", "").await.unwrap()),
+    )
+    .await?;
 
     Ok(())
 }
