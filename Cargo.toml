@@ -23,7 +23,7 @@ regex = "1.10.6"
 reqwest = { version = "0.11.27", features = ["json"] }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.122"
-songbird = { version = "0.4.4", default-features = true, features = [
+songbird = { version = "~0.4.3", default-features = true, features = [
     "builtin-queue",
 ], git = "https://github.com/eRgo35/songbird" }
 serenity = { default-features = true, features = [
