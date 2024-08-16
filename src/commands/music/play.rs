@@ -132,6 +132,7 @@ async fn parse_data(data: String) -> VecDeque<String> {
                 .unwrap();
 
                 let list = Command::new("yt-dlp")
+                    .args(["--username", "oauth2", "--password", "''"])
                     .args(["-j", "--flat-playlist", track])
                     .output()
                     .expect("Failed to execute process")
