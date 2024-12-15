@@ -68,6 +68,9 @@
               cargo-edit
               cargo-watch
               rust-analyzer
+              cmake
+              opusTools
+              opusfile
             ];
 
             env = {
