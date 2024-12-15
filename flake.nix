@@ -71,6 +71,9 @@
               cmake
               opusTools
               opusfile
+              rustup
+              cargo-cross
+              gcc
             ];
 
             env = {
