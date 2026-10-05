@@ -81,7 +81,7 @@ async fn main() {
     let options = poise::FrameworkOptions {
         commands,
         prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some(prefix.to_string()),
+            prefix: Some(prefix.clone().into()),
             edit_tracker: Some(Arc::new(poise::EditTracker::for_timespan(
                 Duration::from_secs(3600),
             ))),
@@ -113,7 +113,7 @@ async fn main() {
         }),
 
         skip_checks_for_owners: false,
-        event_handler: |_ctx, event, _framework, _data| {
+        event_handler: |_framework_ctx, event| {
             Box::pin(async move {
                 info!(
                     "Got an event in event handler: {:?}",
