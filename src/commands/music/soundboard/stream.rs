@@ -78,7 +78,7 @@ pub async fn stream(
     Ok(())
 }
 
-async fn generate_embed(ctx: Context<'_>, src: YoutubeDl) -> Result<CreateEmbed, Error> {
+async fn generate_embed(ctx: Context<'_>, src: YoutubeDl<'_>) -> Result<CreateEmbed, Error> {
     let metadata = src.clone().aux_metadata().await.unwrap();
     let AuxMetadata {
         title,

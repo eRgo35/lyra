@@ -1,4 +1,3 @@
-use crate::commands::music::metadata::Metadata;
 use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::{commands::embeds::error_embed, Context, Error};
 
@@ -12,11 +11,12 @@ use serenity::all::GuildId;
 use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
-use songbird::tracks::TrackQueue;
+use songbird::tracks::{Track, TrackQueue};
 use songbird::Call;
 use spotify_parser;
 use std::collections::VecDeque;
 use std::process::Command;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Plays a song; \
@@ -109,12 +109,11 @@ async fn handle_play<'a>(
     let aux_metadata = src.clone().aux_metadata().await.unwrap();
 
     handler
-        .enqueue_input(src.clone().into())
-        .await
-        .typemap()
-        .write()
-        .await
-        .insert::<Metadata>(aux_metadata);
+        .enqueue(Track::new_with_data(
+            src.clone().into(),
+            Arc::new(aux_metadata),
+        ))
+        .await;
 
     Ok(results)
 }
@@ -171,12 +170,11 @@ async fn handle_playlist(
             let aux_metadata = src.clone().aux_metadata().await.unwrap();
 
             handler
-                .enqueue_input(src.clone().into())
-                .await
-                .typemap()
-                .write()
-                .await
-                .insert::<Metadata>(aux_metadata);
+                .enqueue(Track::new_with_data(
+                    src.clone().into(),
+                    Arc::new(aux_metadata),
+                ))
+                .await;
         }
     }
 
@@ -185,7 +183,7 @@ async fn handle_playlist(
 
 async fn generate_embed(
     ctx: Context<'_>,
-    src: YoutubeDl,
+    src: YoutubeDl<'_>,
     queue: &TrackQueue,
     results: VecDeque<String>,
 ) -> Result<CreateEmbed, Error> {

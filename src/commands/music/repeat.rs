@@ -2,6 +2,7 @@ use crate::{
     commands::embeds::{embed, error_embed},
     Context, Error,
 };
+use nonmax::NonMaxU32;
 use poise::CreateReply;
 use songbird::tracks::LoopState;
 
@@ -53,7 +54,10 @@ pub async fn repeat(
                     )
                     .await?;
                 } else if times < 100 {
-                    let _ = queue.current().unwrap().loop_for(times);
+                    let _ = queue
+                        .current()
+                        .unwrap()
+                        .loop_for(NonMaxU32::new(times as u32).unwrap());
                     ctx.send(
                         CreateReply::default().embed(
                             embed(

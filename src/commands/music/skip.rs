@@ -1,4 +1,3 @@
-use crate::commands::music::metadata::Metadata;
 use std::time::Duration;
 
 use crate::{
@@ -59,8 +58,7 @@ async fn generate_embed(
     track: TrackHandle,
     queue_length: usize,
 ) -> Result<CreateEmbed, Error> {
-    let meta_typemap = track.typemap().read().await;
-    let metadata = meta_typemap.get::<Metadata>().unwrap();
+    let metadata = &*track.data::<AuxMetadata>();
     let AuxMetadata {
         title,
         thumbnail,

@@ -1,7 +1,6 @@
 pub mod deafen;
 pub mod join;
 pub mod leave;
-pub mod metadata;
 pub mod mute;
 pub mod notifier;
 pub mod pause;

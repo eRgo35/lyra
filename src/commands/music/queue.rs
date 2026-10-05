@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use crate::commands::music::metadata::Metadata;
 use crate::{commands::embeds::error_embed, Context, Error};
 use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
@@ -28,8 +27,7 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
         let mut too_long = false;
 
         for (index, song) in queue.clone().current_queue().iter().enumerate() {
-            let meta_typemap = song.typemap().read().await;
-            let metadata = meta_typemap.get::<Metadata>().unwrap();
+            let metadata = &*song.data::<AuxMetadata>();
             let AuxMetadata {
                 title,
                 artist,

@@ -1,6 +1,6 @@
 [package]
 name = "lyra"
-version = "0.11.0"
+version = "0.11.1"
 authors = ["Michał Czyż <mike@c2yz.com>"]
 edition = "2021"
 description = "A featureful Discord bot written in Rust."
@@ -13,14 +13,14 @@ keywords = ["discord", "bot", "rust", "music", "featureful"]
 
 [dependencies]
 dotenv = "0.15.0"
-owoify = "0.1.5"
+nonmax = "0.5.5"
 poise = { default-features = true, version = "0.7" }
 rand = "0.10"
 regex = "1.10.6"
-reqwest = { version = "0.11.27", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.122"
-songbird = { version = "0.4", default-features = true, features = [
+songbird = { version = "0.6", default-features = true, features = [
     "builtin-queue",
 ] }
 serenity = { default-features = true, features = [
