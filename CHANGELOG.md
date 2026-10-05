@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaced `songbird` git fork (`https://github.com/eRgo35/songbird`,
   no longer reachable) with the crates.io release.
 - Removed unused dependencies: `json`, `tracing-futures`.
+- Bumped `poise` to 0.7 and `serenity` to the latest 0.12.x release.
 
 ### Removed
 
