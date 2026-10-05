@@ -28,9 +28,15 @@ Example can be found in `.env.example` file.
 ```
 DISCORD_TOKEN=<YOUR_DISCORD_TOKEN>
 PREFIX=<YOUR_PREFIX>
+
+# Optional: scope slash-command registration to one guild for instant
+# updates. When unset, commands register globally.
+# GUILD_ID=<YOUR_GUILD_ID>
 ```
 
 DISCORD_TOKEN is the token you got from discord developers page and PREFIX is the prefix you want to use for your bot.
+
+Set `GUILD_ID` to scope slash-command registration to a single guild (updates are instant). Leave it unset to register globally (Discord propagation can take up to an hour).
 
 Bot by default reacts only to the prefix. To enable slash commands, while the bot is running type `:register` in the chat (where `:` is your bot prefix).
 

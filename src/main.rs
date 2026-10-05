@@ -103,15 +103,6 @@ async fn main() {
             })
         },
 
-        command_check: Some(|ctx| {
-            Box::pin(async move {
-                if ctx.author().id == 123456789 {
-                    return Ok(false);
-                }
-                Ok(true)
-            })
-        }),
-
         skip_checks_for_owners: false,
         event_handler: |_framework_ctx, event| {
             Box::pin(async move {
@@ -133,13 +124,16 @@ async fn main() {
                     ready.user.name, ready.user.id
                 );
                 ctx.set_activity(Some(ActivityData::listening(prefix + "help")));
-                // poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                poise::builtins::register_in_guild(
-                    ctx,
-                    &framework.options().commands,
-                    512680330495524873.into(),
-                )
-                .await?;
+
+                let commands = &framework.options().commands;
+                if let Some(guild_id) = std::env::var("GUILD_ID")
+                    .ok()
+                    .and_then(|s| s.parse::<u64>().ok())
+                {
+                    poise::builtins::register_in_guild(ctx, commands, guild_id.into()).await?;
+                } else {
+                    poise::builtins::register_globally(ctx, commands).await?;
+                }
 
                 Ok(Data {
                     http_client: HttpClient::new(),
