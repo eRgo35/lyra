@@ -1,4 +1,4 @@
-use crate::{Context, Error};
+use crate::{commands::embeds::embed, Context, Error};
 use poise::CreateReply;
 use std::fmt::Write as _;
 
@@ -148,6 +148,9 @@ You can edit you message to the bot and the bot will edit its response.";
         text
     };
 
-    ctx.send(CreateReply::default().content(reply)).await?;
+    ctx.send(
+        CreateReply::default().embed(embed(ctx, "Lyra", &reply, "").await.unwrap()),
+    )
+    .await?;
     Ok(())
 }
