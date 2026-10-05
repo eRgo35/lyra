@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no longer reachable) with the crates.io release.
 - Removed unused dependencies: `json`, `tracing-futures`.
 - Bumped `poise` to 0.7 and `serenity` to the latest 0.12.x release.
+- Bumped `rand` to 0.10 (`thread_rng()` → `rng()`; `gen_range` →
+  `random_range`; `rand::Rng` → `rand::RngExt`).
+- Bumped `tokio`, `tracing`, and `tracing-subscriber` to their latest
+  releases.
+- Switched `reqwest` to `rustls-tls` only (dropped `default-features`).
+  The `reqwest` major version stays at 0.11 because `songbird` 0.4 pins
+  `reqwest` 0.11; bumping `reqwest` further requires a `songbird`
+  upgrade, which is out of scope for this phase.
 
 ### Removed
 

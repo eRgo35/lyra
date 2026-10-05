@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 
 use std::thread::sleep;
 use std::time::Duration;
@@ -28,9 +28,9 @@ pub async fn ai(
     println!("Funny prompts: {}", prompt);
 
     let response = {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
-        rng.gen_range(0..iamsorry.len())
+        rng.random_range(0..iamsorry.len())
     };
 
     sleep(Duration::from_secs(1));
