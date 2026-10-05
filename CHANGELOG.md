@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced `songbird` git fork (`https://github.com/eRgo35/songbird`,
+  no longer reachable) with the crates.io release.
+- Removed unused dependencies: `json`, `tracing-futures`.
+
+### Removed
+
+- `[patch.crates-io.serenity-voice-model]` table (no longer required).
+
 ## [0.10.8](https://github.com/eRgo35/lyra/compare/v0.10.7...v0.10.8) - 2024-12-15
 
 ### Fixed

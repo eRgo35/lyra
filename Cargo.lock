@@ -1472,12 +1472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "json"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "078e285eafdfb6c4b434e0d31e8cfcb5115b651496faca5749b88fafd4f23bfd"
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1543,9 +1537,7 @@ name = "lyra"
 version = "0.10.8"
 dependencies = [
  "dotenv",
- "json",
  "once_cell",
- "openssl",
  "owoify",
  "poise",
  "rand 0.8.5",
@@ -1559,7 +1551,6 @@ dependencies = [
  "symphonia",
  "tokio",
  "tracing",
- "tracing-futures",
  "tracing-subscriber",
  "url",
 ]
@@ -1807,15 +1798,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
-name = "openssl-src"
-version = "300.4.1+3.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faa4eac4138c62414b5622d1b31c5c304f34b406b013c079c2bbc652fdd6678c"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "openssl-sys"
 version = "0.9.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1823,7 +1805,6 @@ checksum = "45abf306cbf99debc8195b66b7346498d7b10c210de50418b5ccd7ceba08c741"
 dependencies = [
  "cc",
  "libc",
- "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -2935,8 +2916,9 @@ dependencies = [
 
 [[package]]
 name = "serenity-voice-model"
-version = "0.2.0"
-source = "git+https://github.com/serenity-rs/serenity?branch=current#452bf821a9d205d06b8b3d19fba0b2afed90df1c"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "790de0c27162611d3adbb98eb83abc295ecd0d608ad9c36653b3e5f2bd06dc22"
 dependencies = [
  "bitflags 2.6.0",
  "num-traits",
@@ -3050,7 +3032,8 @@ dependencies = [
 [[package]]
 name = "songbird"
 version = "0.4.6"
-source = "git+https://github.com/eRgo35/songbird#2146846df4b7b207611cb4d4047a3e8e5aeaaed5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30c6bde67a7ba20c8d9abefa35dfbb4f7abb570b344af73c201626033fb64703"
 dependencies = [
  "aead",
  "aes-gcm",
