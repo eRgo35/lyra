@@ -33,7 +33,7 @@ serenity = { default-features = true, features = [
     "rustls_backend",
 ], version = "0.12.5" }
 spotify-parser = "1.0.2"
-symphonia = { version = "0.5.4", features = [
+symphonia = { version = "0.6.1", features = [
     "aac",
     "adpcm",
     "alac",
