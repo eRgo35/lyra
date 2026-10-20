@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="512" height="512" role="img" aria-labelledby="title desc">
+  <title id="title">Lyra</title>
+  <desc id="desc">A white beamed pair of eighth notes with a hard black drop shadow on a pink background.</desc>
+  <defs>
+    <clipPath id="tile"><rect width="1000" height="1000" rx="200"/></clipPath>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="22"/></filter>
+    <!-- Beamed note shape; fill is supplied by each <use> -->
+    <g id="notes">
+      <path d="M302 262 L695 158 L695 238 L332 328 Z"/>
+      <rect x="302" y="262" width="30" height="483"/>
+      <rect x="665" y="158" width="30" height="494"/>
+      <circle cx="270" cy="745" r="62"/>
+      <circle cx="635" cy="652" r="62"/>
+      <circle cx="305" cy="245" r="52"/>
+      <circle cx="695" cy="157" r="60"/>
+    </g>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1000" height="1000" fill="#ff3a61"/>
+    <g fill="none" stroke="#c42a4d" stroke-width="46" stroke-linecap="round" opacity="0.28" filter="url(#soft)">
+      <path d="M95 -40 C 140 200 40 380 110 620 S 120 900 90 1040"/>
+      <path d="M430 -40 C 470 180 380 400 450 600 S 470 880 440 1040"/>
+      <path d="M810 -40 C 850 220 760 400 830 620 S 850 880 820 1040"/>
+    </g>
+    <use href="#notes" fill="#000" transform="translate(24 28)"/>
+    <use href="#notes" fill="#fff"/>
+    <circle cx="305" cy="245" r="52" fill="#ff3a61"/>
+    <circle cx="695" cy="157" r="60" fill="#ff3a61"/>
+  </g>
+</svg>
