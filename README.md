@@ -43,7 +43,7 @@ Bot by default reacts only to the prefix. To enable slash commands, while the bo
 ## Features
 
 - Music playback
-- Audio effects (soon)
+- Audio effects and stream override (`/effect`, `/stream`)
 - Some multipurpose commands
 - Slash commands
 - Self-hosted
