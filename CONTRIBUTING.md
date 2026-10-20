@@ -10,8 +10,8 @@ Thanks for your interest in Lyra! Bug reports, feature ideas and pull requests a
 
 ## Setup
 
-You need a recent stable Rust toolchain (with `rustfmt` and `clippy`), a C compiler, `cmake`,
-`pkg-config` and OpenSSL development headers. To actually run the bot you also need
+You need a recent stable Rust toolchain (with `rustfmt` and `clippy`), a C compiler, `cmake`
+and `pkg-config`. To actually run the bot you also need
 [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) and a Discord bot token; see the
 [README](README.md#quick-start). With Nix, `nix develop` provides the build dependencies.
 

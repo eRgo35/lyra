@@ -46,8 +46,7 @@ music in your voice channels. It runs on a desktop, a VPS or anything else that 
 | Discord application + bot token | running | Create one in the [Developer Portal](https://discord.com/developers/applications). |
 | **Message Content Intent** | running | Privileged intent; must be enabled on the bot page of the Developer Portal. |
 | [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) on `PATH` | music commands | Invoked by name (`yt-dlp`) for every track lookup. |
-| OpenSSL 3 shared library (`libssl.so.3`) | running | The binary links it dynamically (checked with `ldd` on a release build). |
-| Rust (recent stable), C compiler, `cmake`, `pkg-config`, OpenSSL headers | building from source | `cmake` builds the bundled libopus when no system libopus is found. No MSRV is declared. |
+| Rust (recent stable), C compiler, `cmake`, `pkg-config` | building from source | `cmake` builds the bundled libopus when no system libopus is found. No MSRV is declared. |
 
 `ffmpeg` is **not** called by Lyra's code; audio is decoded in-process with Symphonia. `yt-dlp`
 itself may want `ffmpeg` for some sites; that is outside what has been verified here.
@@ -154,8 +153,8 @@ git checkout senpai            # development branch
 cargo build --release          # binary: target/release/lyra
 ```
 
-You need a Rust toolchain, a C compiler, `cmake`, `pkg-config` and OpenSSL development headers
-(for example `build-essential cmake pkg-config libssl-dev` on Debian/Ubuntu).
+You need a Rust toolchain, a C compiler, `cmake` and `pkg-config`
+(for example `build-essential cmake pkg-config` on Debian/Ubuntu).
 `cargo run` starts a debug build. For an `aarch64-unknown-linux-gnu` binary,
 [`scripts/cross-build.sh`](scripts/cross-build.sh) wraps `cross build -r --target aarch64-unknown-linux-gnu`
 (requires [`cross`](https://github.com/cross-rs/cross) and a container engine).

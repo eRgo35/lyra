@@ -43,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added unit tests for the inline `owoify` implementation.
 - Crate metadata: new `description`, updated `keywords` and added
   `categories` in `Cargo.toml`.
+- `spotify-parser` 1.0.1 → 1.0.2 (reqwest default features disabled upstream);
+  `native-tls`, `hyper-tls` and OpenSSL are no longer in the dependency tree or
+  linked into the binary.
 
 ### Security
 
@@ -92,9 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   → davey → openmls, upstream), `proc-macro-error2 2.0.1` (build time, via
   libcrux), `fxhash 0.2.1` (spotify-parser → scraper 0.19.1) and `dotenv
   0.15.0` (lyra direct; replaceable with `dotenvy`).
-- `native-tls` / `hyper-tls` are still compiled in: `spotify-parser
-  1.0.1` depends on `reqwest` with default features. Needs a
-  `spotify-parser` release with `default-features = false`.
 - Details, evidence and commands: `docs/research/2026-10-20-dependency-blockers.md`.
 
 ## [0.11.1] - 2026-10-05
