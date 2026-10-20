@@ -4,6 +4,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.2] - 2026-10-20
+
+### Fixed
+
+- `Release` workflow no longer hangs: regenerated with cargo-dist 0.33
+  (was 0.20.0), which targets `ubuntu-22.04` instead of the retired
+  `ubuntu-20.04` runner image. The v0.11.0 and v0.11.1 release runs
+  were cancelled after 24h waiting for a runner, so no GitHub Release
+  was published for them.
+- Startup no longer panics when no `.env` file exists (variables from the
+  real environment are used); an unparseable `GUILD_ID` is now a hard
+  startup error instead of being silently ignored.
+- Music and soundboard commands no longer panic when invoked outside a
+  server (DM).
+
+### Changed
+
+- Removed the `release-plz` workflow: its `RELEASE_PLZ_TOKEN` was
+  rejected (HTTP 401) on every push, and releases are cut by hand-made
+  tags built by cargo-dist. See `RELEASING.md`.
+- CI now runs `cargo fmt --check` and `cargo clippy -D warnings`, uses
+  `--locked`, and caches the cargo build.
+- Added unit tests for the inline `owoify` implementation.
+
+### Security (known, unresolved)
+
+- Dependabot #31, #21, #24, #23 (`rustls-webpki 0.102.8`): pulled in via
+  `serenity 0.12.5 → tokio-tungstenite 0.21 → rustls 0.22.4`. 0.12.5 is
+  the last serenity 0.12 release; the fix needs serenity's `next` branch
+  (breaking, together with poise).
+- Dependabot #36 (`libcrux-chacha20poly1305 0.0.7`, patched in 0.0.8):
+  hard-pinned by `hpke-rs-libcrux 0.6.1 ← openmls_rust_crypto 0.5.1 ←
+  davey 0.1.4 ← songbird 0.6.0`. The crate is in `Cargo.lock` but is not
+  compiled for any target (`cargo tree -i` is empty).
+- `native-tls` / `hyper-tls` are still compiled in: `spotify-parser
+  1.0.1` depends on `reqwest` with default features. Needs a
+  `spotify-parser` release with `default-features = false`.
+
 ## [0.11.1] - 2026-10-05
 
 ### Security
@@ -16,10 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (already in the tree) and preserves the trait surface
   (`OwOifiable for String { fn owoify(&self) -> Self }`).
 - Bumped `songbird` from 0.4 to 0.6 and `reqwest` from 0.11 to 0.12.
-  songbird 0.6 requires `reqwest ^0.12.2`, which transitively upgrades
-  the rustls / rustls-webpki chain to the patched 0.23 / 0.103 lines.
-  Closes Dependabot alerts #31 (high), #21 (medium), #24 (low) and
-  #23 (low) on the `rustls-webpki` side.
+  songbird 0.6 requires `reqwest ^0.12.2`, which upgrades the reqwest /
+  hyper-rustls side of the TLS chain to rustls 0.23 / rustls-webpki
+  0.103. **Correction (see 0.11.2):** this did *not* close Dependabot
+  alerts #31, #21, #24 and #23; `rustls-webpki 0.102.8` is still pulled
+  in by `serenity 0.12.5`'s websocket stack (`tokio-tungstenite 0.21`).
 - Dropped the `owoify` and `rustls-webpki 0.101.7` / `rustls 0.21.x`
   transitive paths from `Cargo.lock`. `ring 0.16.20` (Dependabot alert
   #10) also leaves the lockfile automatically.
