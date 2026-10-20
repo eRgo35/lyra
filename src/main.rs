@@ -37,13 +37,28 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
-    dotenv::dotenv().expect("Failed to load .env file.");
+    // Optional: variables may come from the real environment instead.
+    dotenv::dotenv().ok();
 
     let _ = *PROCESS_UPTIME.lock().unwrap();
 
     let token =
         std::env::var("DISCORD_TOKEN").expect("Environment variable `DISCORD_TOKEN` not found!");
     let prefix = std::env::var("PREFIX").expect("Environment variable `PREFIX` not found!");
+
+    let guild_id: Option<u64> = match std::env::var("GUILD_ID") {
+        Ok(raw) => match raw.trim().parse() {
+            Ok(id) => Some(id),
+            Err(_) => {
+                error!("Environment variable `GUILD_ID` is not a valid guild id: {raw:?}");
+                std::process::exit(1);
+            }
+        },
+        Err(_) => None,
+    };
+
+    let http_client = HttpClient::new();
+    let data_http_client = http_client.clone();
 
     let commands = vec![
         music::deafen(),
@@ -126,17 +141,14 @@ async fn main() {
                 ctx.set_activity(Some(ActivityData::listening(prefix + "help")));
 
                 let commands = &framework.options().commands;
-                if let Some(guild_id) = std::env::var("GUILD_ID")
-                    .ok()
-                    .and_then(|s| s.parse::<u64>().ok())
-                {
+                if let Some(guild_id) = guild_id {
                     poise::builtins::register_in_guild(ctx, commands, guild_id.into()).await?;
                 } else {
                     poise::builtins::register_globally(ctx, commands).await?;
                 }
 
                 Ok(Data {
-                    http_client: HttpClient::new(),
+                    http_client: data_http_client,
                 })
             })
         })
@@ -149,17 +161,19 @@ async fn main() {
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .register_songbird()
-        .type_map_insert::<HttpKey>(HttpClient::new())
+        .type_map_insert::<HttpKey>(http_client)
         .await
         .expect("Error creating client");
 
-    tokio::spawn(async move {
-        let _ = client
-            .start()
-            .await
-            .map_err(|why| error!("Client ended: {:?}", why));
-    });
-
-    let _signal_err = tokio::signal::ctrl_c().await;
-    warn!("Recieved Ctrl-C, shutting down.");
+    tokio::select! {
+        result = client.start() => {
+            if let Err(why) = result {
+                error!("Client ended: {:?}", why);
+                std::process::exit(1);
+            }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            warn!("Received Ctrl-C, shutting down.");
+        }
+    }
 }
