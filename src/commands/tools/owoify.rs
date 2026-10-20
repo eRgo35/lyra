@@ -61,3 +61,47 @@ pub async fn owoify(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::OwOifiable;
+
+    fn owo(s: &str) -> String {
+        s.to_string().owoify()
+    }
+
+    #[test]
+    fn replaces_r_and_l_preserving_case() {
+        assert_eq!(owo("hello world"), "hewwo wowwd");
+        assert_eq!(owo("LARGE Rain"), "WAWGE Wain");
+    }
+
+    #[test]
+    fn inserts_y_after_n_before_vowel() {
+        assert_eq!(owo("banana"), "banyanya");
+        assert_eq!(owo("Nap"), "Nyap");
+        assert_eq!(owo("NAO"), "NYAO");
+        assert_eq!(owo("nope"), "nyope");
+        assert_eq!(owo("string"), "stwing");
+    }
+
+    #[test]
+    fn rules_apply_in_order() {
+        // l -> w runs before ove -> uv and th -> d.
+        assert_eq!(owo("love the"), "wuv de");
+    }
+
+    #[test]
+    fn exclamation_run_becomes_one_face() {
+        let out = owo("yay!!!");
+        assert!(out.starts_with("yay "), "got {out:?}");
+        assert!(!out.contains('!'), "got {out:?}");
+        assert!(out.ends_with(' '), "got {out:?}");
+    }
+
+    #[test]
+    fn text_without_patterns_is_untouched() {
+        assert_eq!(owo(""), "");
+        assert_eq!(owo("日本語 ñ 123"), "日本語 ñ 123");
+    }
+}
