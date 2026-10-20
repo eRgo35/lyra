@@ -14,7 +14,17 @@ impl OwOifiable for String {
     /// Owoifies a String
     fn owoify(&self) -> Self {
         let mut rng = rand::rng();
-        let faces = ["(・`ω´・)", "OwO", "owo", "oωo", "òωó", "°ω°", "UwU", ">w<", "^w^"];
+        let faces = [
+            "(・`ω´・)",
+            "OwO",
+            "owo",
+            "oωo",
+            "òωó",
+            "°ω°",
+            "UwU",
+            ">w<",
+            "^w^",
+        ];
         let face = &format!(" {} ", faces[rng.random_range(0..faces.len())]).to_owned();
         let pats: Vec<(&str, &str)> = vec![
             ("(?:r|l)", "w"),

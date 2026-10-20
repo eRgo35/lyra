@@ -20,11 +20,9 @@ You can edit you message to the bot and the bot will edit its response.";
 
     let commands = &ctx.framework().options().commands;
 
-    let mut found = command.as_ref().and_then(|name| {
-        commands
-            .iter()
-            .find(|c| c.name.eq_ignore_ascii_case(name))
-    });
+    let mut found = command
+        .as_ref()
+        .and_then(|name| commands.iter().find(|c| c.name.eq_ignore_ascii_case(name)));
 
     // If not a top-level command, try to find a subcommand by traversing qualified_name
     if found.is_none() {
@@ -77,9 +75,18 @@ You can edit you message to the bot and the bot will edit its response.";
         let mut params_text = String::new();
         if !cmd.parameters.is_empty() {
             params_text.push_str("\n\n```\nParameters:\n");
-            let longest = cmd.parameters.iter().map(|p| p.name.len()).max().unwrap_or(0);
+            let longest = cmd
+                .parameters
+                .iter()
+                .map(|p| p.name.len())
+                .max()
+                .unwrap_or(0);
             for parameter in &cmd.parameters {
-                let req = if parameter.required { "required" } else { "optional" };
+                let req = if parameter.required {
+                    "required"
+                } else {
+                    "optional"
+                };
                 let desc = parameter.description.as_deref().unwrap_or("");
                 let padding = " ".repeat(longest.saturating_sub(parameter.name.len()) + 3);
                 writeln!(
@@ -95,7 +102,12 @@ You can edit you message to the bot and the bot will edit its response.";
         let mut subs_text = String::new();
         if !cmd.subcommands.is_empty() {
             subs_text.push_str("\n\n```\nSubcommands:\n");
-            let longest = cmd.subcommands.iter().map(|s| s.name.len()).max().unwrap_or(0);
+            let longest = cmd
+                .subcommands
+                .iter()
+                .map(|s| s.name.len())
+                .max()
+                .unwrap_or(0);
             for sub in &cmd.subcommands {
                 let desc = sub.description.as_deref().unwrap_or("");
                 let padding = " ".repeat(longest.saturating_sub(sub.name.len()) + 3);
@@ -104,7 +116,10 @@ You can edit you message to the bot and the bot will edit its response.";
             subs_text.push_str("```");
         }
 
-        format!("**{}**\n\n{}{}{}", invocations, text, params_text, subs_text)
+        format!(
+            "**{}**\n\n{}{}{}",
+            invocations, text, params_text, subs_text
+        )
     } else if let Some(name) = command {
         format!("No such command `{}`", name)
     } else {
@@ -133,7 +148,10 @@ You can edit you message to the bot and the bot will edit its response.";
                 Some(cat) => cat.to_string(),
                 None => "Uncategorized".to_string(),
             };
-            by_category.entry(category).or_default().push(format!("{}  - {}", invocation, description));
+            by_category
+                .entry(category)
+                .or_default()
+                .push(format!("{}  - {}", invocation, description));
         }
 
         let mut text = String::new();
@@ -148,9 +166,7 @@ You can edit you message to the bot and the bot will edit its response.";
         text
     };
 
-    ctx.send(
-        CreateReply::default().embed(embed(ctx, "Lyra", &reply, "").await.unwrap()),
-    )
-    .await?;
+    ctx.send(CreateReply::default().embed(embed(ctx, "Lyra", &reply, "").await.unwrap()))
+        .await?;
     Ok(())
 }
