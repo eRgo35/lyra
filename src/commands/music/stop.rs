@@ -6,7 +6,13 @@ use poise::CreateReply;
 
 /// Stops playback and destroys the queue; \
 /// aliases: stop, end
-#[poise::command(prefix_command, slash_command, aliases("end"), category = "Music")]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    aliases("end"),
+    guild_only,
+    category = "Music"
+)]
 pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 

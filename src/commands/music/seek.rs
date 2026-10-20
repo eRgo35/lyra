@@ -7,7 +7,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Seeks a track by provided seconds
-#[poise::command(prefix_command, slash_command, category = "Music")]
+#[poise::command(prefix_command, slash_command, guild_only, category = "Music")]
 pub async fn seek(
     ctx: Context<'_>,
     #[description = "How many seconds shall I seek"] seek: u64,

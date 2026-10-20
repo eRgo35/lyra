@@ -11,6 +11,7 @@ use songbird::tracks::LoopState;
 #[poise::command(
     prefix_command,
     slash_command,
+    guild_only,
     aliases("loop", "while", "for"),
     category = "Music"
 )]

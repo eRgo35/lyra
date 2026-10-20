@@ -18,6 +18,7 @@ use crate::http::HttpKey;
 #[poise::command(
     prefix_command,
     slash_command,
+    guild_only,
     aliases("override", "hijack"),
     category = "Music"
 )]

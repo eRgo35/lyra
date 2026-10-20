@@ -5,7 +5,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Resumes currently paused song
-#[poise::command(prefix_command, slash_command, category = "Music")]
+#[poise::command(prefix_command, slash_command, guild_only, category = "Music")]
 pub async fn resume(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 

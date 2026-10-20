@@ -5,7 +5,7 @@ use crate::{
 use poise::CreateReply;
 
 /// Changes output volume
-#[poise::command(prefix_command, slash_command, category = "Music")]
+#[poise::command(prefix_command, slash_command, guild_only, category = "Music")]
 pub async fn volume(ctx: Context<'_>, #[description = "Volume"] volume: f32) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 

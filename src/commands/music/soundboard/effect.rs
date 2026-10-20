@@ -13,7 +13,7 @@ use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::http::HttpKey;
 
 /// Plays one of available audio effects
-#[poise::command(prefix_command, slash_command, category = "Music")]
+#[poise::command(prefix_command, slash_command, guild_only, category = "Music")]
 pub async fn effect(
     ctx: Context<'_>,
     #[description = "Shall output pause?"]

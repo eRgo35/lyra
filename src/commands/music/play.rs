@@ -25,6 +25,7 @@ use std::time::Duration;
 #[poise::command(
     prefix_command,
     slash_command,
+    guild_only,
     aliases("p", "enqueue"),
     category = "Music"
 )]

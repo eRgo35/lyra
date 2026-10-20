@@ -11,7 +11,13 @@ const QUEUE_DISPLAY_LENGTH: usize = 10;
 
 /// Shows next tracks in queue; \
 /// aliases: queue, q
-#[poise::command(prefix_command, slash_command, aliases("q"), category = "Music")]
+#[poise::command(
+    prefix_command,
+    slash_command,
+    aliases("q"),
+    guild_only,
+    category = "Music"
+)]
 pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
 

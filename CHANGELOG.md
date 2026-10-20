@@ -16,8 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Startup no longer panics when no `.env` file exists (variables from the
   real environment are used); an unparseable `GUILD_ID` is now a hard
   startup error instead of being silently ignored.
-- Music and soundboard commands no longer panic when invoked outside a
-  server (DM).
+- Music and soundboard commands are now `guild_only`: using them in a DM
+  gets poise's "guild only" rejection instead of panicking on
+  `ctx.guild_id().unwrap()`.
+- The process now exits with status 1 when the Discord client fails to
+  start (e.g. invalid token) instead of staying alive until Ctrl-C.
 
 ### Changed
 

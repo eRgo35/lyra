@@ -9,6 +9,7 @@ use poise::CreateReply;
 #[poise::command(
     prefix_command,
     slash_command,
+    guild_only,
     aliases("leave", "qa!"),
     category = "Music"
 )]
