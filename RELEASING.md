@@ -28,3 +28,9 @@ locally: `dist plan`.
 If the `Release` run sits in "queued" for a long time, a runner label in
 `release.yml` is probably retired (this is what stalled v0.11.0 and v0.11.1
 on `ubuntu-20.04`); regenerate with a current `cargo-dist-version`.
+
+## Note on crates.io
+
+`cargo publish` ignores `[patch.crates-io]`, so a build of Lyra from crates.io
+uses upstream `serenity` 0.12.5 (with `tokio-tungstenite` 0.21), not the fork;
+only GitHub/cargo-dist builds from this repository get the patched dependency.

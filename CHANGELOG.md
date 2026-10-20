@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- `serenity` 0.12.5 is now taken from a one-line fork
+  ([`eRgo35/serenity`](https://github.com/eRgo35/serenity), branch
+  `lyra/tokio-tungstenite-0.23`, rev `c897f7d`) through `[patch.crates-io]`.
+  The fork bumps only `tokio-tungstenite` 0.21 → 0.23.1 (same change as
+  serenity-rs/serenity#3599, see #3557; upstream will not merge it into its
+  frozen `current` branch). This removes `rustls` 0.22.4, `rustls-webpki`
+  0.102.8 and `tokio-rustls` 0.25 from the dependency tree; `tungstenite`
+  0.23 uses `rustls` 0.23 / `rustls-webpki` 0.103. Closes Dependabot alerts
+  #31, #21, #24 and #23 and RUSTSEC-2026-0382 / -0346 / -0349 on the gateway
+  path, i.e. those three items under "Security (known, unresolved)" in 0.11.2.
+  No Lyra source change; a real `wss://gateway.discord.gg` handshake was
+  verified. Remove the patch when serenity 0.13 is released.
+- Still unresolved: RUSTSEC-2026-0381 (`webpki-roots 0.26.11`, needs 1.x), the
+  lock-only `libcrux` advisories, `ringbuf` 0.4.8 (RUSTSEC-2026-0293) and the
+  unmaintained-crate warnings.
+
 ## [0.11.2] - 2026-10-20
 
 ### Added
