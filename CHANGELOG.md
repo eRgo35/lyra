@@ -44,19 +44,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crate metadata: new `description`, updated `keywords` and added
   `categories` in `Cargo.toml`.
 
+### Security
+
+- `cargo update` (`Cargo.lock` only, no `Cargo.toml` change) bumps
+  `rustls 0.23.45 → 0.23.46` (RUSTSEC-2026-0346, -0347, -0348, -0349),
+  `rustls-webpki 0.103.15 → 0.103.16` (RUSTSEC-2026-0382, distrusted
+  emSign intermediates) and `webpki-roots 1.0.9 → 1.0.10`
+  (RUSTSEC-2026-0381). Other lock updates include `songbird 0.6.0 → 0.6.1`,
+  `davey 0.1.4 → 0.1.5`, `poise 0.7.0 → 0.7.1`, `tokio 1.53.2 → 1.54.0` and
+  `hyper 1.11.1 → 1.12.0` (31 packages in total).
+
 ### Security (known, unresolved)
 
-- Dependabot #31, #21, #24, #23 (`rustls-webpki 0.102.8`): pulled in via
-  `serenity 0.12.5 → tokio-tungstenite 0.21 → rustls 0.22.4`. 0.12.5 is
-  the last serenity 0.12 release; the fix needs serenity's `next` branch
-  (breaking, together with poise).
-- Dependabot #36 (`libcrux-chacha20poly1305 0.0.7`, patched in 0.0.8):
-  hard-pinned by `hpke-rs-libcrux 0.6.1 ← openmls_rust_crypto 0.5.1 ←
-  davey 0.1.4 ← songbird 0.6.0`. The crate is in `Cargo.lock` but is not
-  compiled for any target (`cargo tree -i` is empty).
+- Dependabot #31, #21, #24, #23 (`rustls-webpki 0.102.8`, RUSTSEC-2026-0104,
+  -0049, -0099, -0098) are compiled via `serenity 0.12.5 → tokio-tungstenite
+  0.21 → tokio-rustls 0.25 → rustls 0.22.4`. #31 and #21 are CRL-only paths,
+  and this bot never configures CRLs. #24 and #23 need a misissuing,
+  name-constrained CA; the discord.com chain (GTS Root R4 → WE1) has no name
+  constraints. Fix: serenity PR #3599 (tokio-tungstenite 0.23.1) via a
+  `[patch.crates-io]` fork, or serenity `next` once released (breaking,
+  together with poise).
+- RUSTSEC-2026-0382 (distrusted emSign intermediates) also hits this
+  `rustls-webpki 0.102.8` on the gateway path. RUSTSEC-2026-0381 hits
+  `webpki-roots 0.26.11` (`tokio-tungstenite 0.21` in serenity, `0.26` in
+  songbird). 0382 is the one with a real, if narrow, attack. No 0.26.x fix
+  exists; 0381 needs `webpki-roots 1.x`.
+- RUSTSEC-2026-0346 and -0349 on `rustls 0.22.4` (same serenity path): 0349
+  affects only ML-KEM key exchange, which 0.22.4 lacks; 0346 needs a custom
+  session store that logs values, and none exists. The same serenity fix
+  removes this path.
+- Dependabot #36 (`libcrux-chacha20poly1305 0.0.7`, RUSTSEC-2026-0124, patched
+  in 0.0.8) is a lock-only entry and is never compiled (`cargo tree -i
+  libcrux-chacha20poly1305 --target all` is empty). It enters only through
+  `hpke-rs`'s weak, inactive `libcrux` feature edge (`songbird 0.6.1 → davey
+  0.1.5 → openmls_rust_crypto 0.5.1 → hpke-rs 0.6.1`). It cannot be bumped
+  until davey moves to openmls ≥ 0.9.
+- RUSTSEC-2026-0209, -0211 (`libcrux-aesgcm 0.0.7`) and -0330, -0331
+  (`libcrux-kem 0.0.7`) are on the same lock-only path and are never compiled.
+- RUSTSEC-2026-0207, -0208 (`libcrux-sha3 0.0.8`, via `hpke-rs 0.6.1`) and
+  -0212 (`libcrux-secrets 0.0.5`, aarch64 only) are compiled. Source review
+  finds the affected functions are not called by the MLS/DAVE ciphersuites.
+  Upstream only.
+- RUSTSEC-2026-0293 (`ringbuf 0.4.8`, via songbird) is compiled. The
+  `Consumer::skip` path is used on `HeapCons<u8>`, whose `Drop` cannot panic.
+  Needs songbird on `ringbuf >= 0.5.2`.
+- Unmaintained warnings: `derivative 2.2.0` and `instant 0.1.13` (songbird
+  → davey → openmls, upstream), `proc-macro-error2 2.0.1` (build time, via
+  libcrux), `fxhash 0.2.1` (spotify-parser → scraper 0.19.1) and `dotenv
+  0.15.0` (lyra direct; replaceable with `dotenvy`).
 - `native-tls` / `hyper-tls` are still compiled in: `spotify-parser
   1.0.1` depends on `reqwest` with default features. Needs a
   `spotify-parser` release with `default-features = false`.
+- Details, evidence and commands: `docs/research/2026-10-20-dependency-blockers.md`.
 
 ## [0.11.1] - 2026-10-05
 
