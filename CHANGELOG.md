@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `dotenv` 0.15 (unmaintained, RUSTSEC-2021-0141) replaced by its maintained
+  drop-in fork `dotenvy`.
+
 ### Security
 
 - `serenity` 0.12.5 is now taken from a one-line fork

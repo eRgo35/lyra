@@ -38,7 +38,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
 async fn main() {
     tracing_subscriber::fmt::init();
     // Optional: variables may come from the real environment instead.
-    dotenv::dotenv().ok();
+    dotenvy::dotenv().ok();
 
     let _ = *PROCESS_UPTIME.lock().unwrap();
 

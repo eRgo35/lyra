@@ -13,7 +13,7 @@ keywords = ["discord", "bot", "music", "self-hosted", "poise"]
 categories = ["multimedia::audio", "network-programming"]
 
 [dependencies]
-dotenv = "0.15.0"
+dotenvy = "0.15.7"
 nonmax = "0.5.5"
 poise = { default-features = true, version = "0.7" }
 rand = "0.10"
