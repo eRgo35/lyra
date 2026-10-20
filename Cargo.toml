@@ -47,6 +47,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.2"
 once_cell = "1.19.0"
 
+# serenity 0.12.5 pins tokio-tungstenite 0.21 -> rustls 0.22 -> rustls-webpki 0.102.8 (RUSTSEC-2026-0049/0098/0099/0104/0382).
+# Our fork bumps only that dependency to 0.23.1 (see serenity-rs/serenity#3599, #3557). Remove when serenity 0.13 is released.
+[patch.crates-io]
+serenity = { git = "https://github.com/eRgo35/serenity", rev = "c897f7dba2e0ed9dba368fc963102e5b7afd622b" }
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
