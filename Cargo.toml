@@ -3,13 +3,14 @@ name = "lyra"
 version = "0.11.2"
 authors = ["Michał Czyż <mike@c2yz.com>"]
 edition = "2021"
-description = "A featureful Discord bot written in Rust."
+description = "A self-hosted Discord music bot written in Rust, with prefix and slash commands."
 documentation = "https://github.com/eRgo35/lyra"
 repository = "https://github.com/eRgo35/lyra"
 readme = "README.md"
 homepage = "https://lyra.c2yz.com"
 license-file = "LICENSE.md"
-keywords = ["discord", "bot", "rust", "music", "featureful"]
+keywords = ["discord", "bot", "music", "self-hosted", "poise"]
+categories = ["multimedia::audio", "network-programming"]
 
 [dependencies]
 dotenv = "0.15.0"

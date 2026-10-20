@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.2] - 2026-10-20
 
+### Added
+
+- Rewritten `README.md`: requirements (`yt-dlp`, Message Content intent),
+  quick start with invite URL, configuration table and a command reference
+  verified against the source.
+- SVG logo (`assets/lyra.svg`), a 512px icon (`assets/lyra-512.png`) and a
+  GitHub social preview image (`assets/social-preview.png`).
+- `SECURITY.md`, `CONTRIBUTING.md`, GitHub issue templates (bug report,
+  feature request), a pull request template and a Dependabot config
+  (cargo and github-actions, weekly, targeting `senpai`).
+
 ### Fixed
 
 - `Release` workflow no longer hangs: regenerated with cargo-dist 0.33
@@ -30,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI now runs `cargo fmt --check` and `cargo clippy -D warnings`, uses
   `--locked`, and caches the cargo build.
 - Added unit tests for the inline `owoify` implementation.
+- Crate metadata: new `description`, updated `keywords` and added
+  `categories` in `Cargo.toml`.
 
 ### Security (known, unresolved)
 
