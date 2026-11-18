@@ -1,17 +1,29 @@
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod ai;
 pub mod dice;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod dictionary;
 pub mod help;
 pub mod ip;
 pub mod metar;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod owoify;
 pub mod ping;
 pub mod posix;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod qr;
 pub mod register;
 pub mod taf;
 pub mod uptime;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod verse;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod weather;
 
 pub use ai::ai;
