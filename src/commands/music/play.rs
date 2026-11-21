@@ -14,9 +14,9 @@ use songbird::tracks::{Track, TrackQueue};
 use songbird::Call;
 use spotify_parser;
 use std::collections::VecDeque;
-use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::process::Command;
 use tracing::warn;
 
 /// Plays a song; \
@@ -87,7 +87,20 @@ async fn handle_play<'a>(
     mut handler: tokio::sync::MutexGuard<'a, Call>,
     http_client: Client,
 ) -> Result<VecDeque<String>, Error> {
-    let mut results = parse_data(song).await;
+    let mut results = match parse_data(song).await {
+        Ok(results) => results,
+        Err(e) => {
+            warn!("Failed to run yt-dlp: {e}");
+            let msg = if e.kind() == std::io::ErrorKind::NotFound {
+                "`yt-dlp` was not found! Install it and make sure it is on PATH.".to_string()
+            } else {
+                format!("Failed to run `yt-dlp`: {e}")
+            };
+            ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
+                .await?;
+            return Ok(VecDeque::new());
+        }
+    };
 
     let Some(first) = results.pop_front() else {
         let msg = "No tracks found!";
@@ -126,37 +139,40 @@ async fn handle_play<'a>(
     Ok(results)
 }
 
-async fn parse_data(data: String) -> VecDeque<String> {
-    let tracks = spotify_parser::retrieve_async_url(&data)
+async fn parse_data(data: String) -> std::io::Result<VecDeque<String>> {
+    let mut tracks = VecDeque::new();
+
+    for track in spotify_parser::retrieve_async_url(&data)
         .await
         .unwrap_or(vec![data])
-        .iter()
-        .flat_map(|track| {
-            if track.contains("?list=") {
-                let list = Command::new("yt-dlp")
-                    .args(["-j", "--flat-playlist", track])
-                    .output()
-                    .expect("Failed to execute process")
-                    .stdout;
+    {
+        if track.contains("?list=") {
+            let output = Command::new("yt-dlp")
+                .args(["-j", "--flat-playlist", "--", &track])
+                .output()
+                .await?;
 
-                playlist_urls(&String::from_utf8_lossy(&list))
-            } else if track.starts_with("http") {
-                vec![track.clone()]
-            } else {
-                vec![format!("ytsearch:{}", track)]
-            }
-        })
-        .collect();
+            tracks.extend(playlist_urls(&String::from_utf8_lossy(&output.stdout)));
+        } else if track.starts_with("http") {
+            tracks.push_back(track);
+        } else {
+            tracks.push_back(format!("ytsearch:{}", track));
+        }
+    }
 
-    tracks
+    Ok(tracks)
 }
 
 /// Track URLs from `yt-dlp -j --flat-playlist` output (one JSON object per line).
+///
+/// Only `http(s)` URLs are kept: entries are later passed to yt-dlp by songbird without
+/// a `--` separator, so a value starting with `-` would be parsed as an option.
 fn playlist_urls(output: &str) -> Vec<String> {
     output
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
         .filter_map(|entry| entry.get("url")?.as_str().map(str::to_string))
+        .filter(|url| url.starts_with("http"))
         .collect()
 }
 
@@ -277,8 +293,21 @@ mod tests {
     fn playlist_urls_skips_non_json_and_entries_without_url() {
         assert!(playlist_urls("").is_empty());
         assert_eq!(
-            playlist_urls("WARNING: something\n{\"id\": \"x\"}\n{\"url\": \"u\"}\n"),
-            vec!["u"]
+            playlist_urls("WARNING: something\n{\"id\": \"x\"}\n{\"url\": \"https://u\"}\n"),
+            vec!["https://u"]
         );
+    }
+
+    #[test]
+    fn playlist_urls_drops_values_that_yt_dlp_would_parse_as_options() {
+        let output = concat!(
+            r#"{"url": "--exec=touch /tmp/pwned"}"#,
+            "\n",
+            r#"{"url": "-o/tmp/x"}"#,
+            "\n",
+            r#"{"url": "relative/path"}"#,
+            "\n",
+        );
+        assert!(playlist_urls(output).is_empty());
     }
 }

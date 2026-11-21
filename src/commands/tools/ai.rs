@@ -1,6 +1,5 @@
 use rand::RngExt;
 
-use std::thread::sleep;
 use std::time::Duration;
 
 use poise::CreateReply;
@@ -33,7 +32,7 @@ pub async fn ai(
         rng.random_range(0..iamsorry.len())
     };
 
-    sleep(Duration::from_secs(1));
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     ctx.send(
         CreateReply::default().embed(
