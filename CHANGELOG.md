@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- YouTube and YouTube Music playlist links work again. The removed yt-dlp
+  OAuth login is no longer passed, every entry is read from yt-dlp's JSON
+  (video IDs with `-`/`_` and `music.youtube.com` links were previously
+  dropped), and `play` replies with an error when no track resolves.
+  Unavailable playlist entries are skipped instead of panicking (#25, #18).
 - `seek`, `volume` and `repeat` reply "Nothing is playing!" instead of
   panicking when the queue is empty (#26).
 - `queue`, `skip`, `play` and the soundboard commands no longer panic on

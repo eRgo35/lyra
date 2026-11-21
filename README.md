@@ -50,8 +50,6 @@ music in your voice channels. It runs on a desktop, a VPS or anything else that 
 
 `ffmpeg` is **not** called by Lyra's code; audio is decoded in-process with Symphonia. `yt-dlp`
 itself may want `ffmpeg` for some sites; that is outside what has been verified here.
-Playlist expansion calls `yt-dlp --flat-playlist` with `--username oauth2 --password ''`, so
-YouTube playlist behaviour depends on your `yt-dlp` version and setup.
 
 ## Quick start
 
