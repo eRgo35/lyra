@@ -62,6 +62,7 @@ async fn main() {
 
     let commands = vec![
         music::deafen(),
+        music::forceplay(),
         music::join(),
         music::leave(),
         music::mute(),

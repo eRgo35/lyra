@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `forceplay` (`fp`, `playnow`) plays a track immediately; the interrupted
+  track is queued right after it and restarts from the beginning. Only the
+  first track of a playlist is used (#5).
 - CI runs `cargo deny check advisories`. Accepted advisories are listed in
   `deny.toml` with their reasons; any new RustSec advisory fails the build.
 

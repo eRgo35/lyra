@@ -1,4 +1,7 @@
 pub mod deafen;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
+pub mod forceplay;
 pub mod join;
 pub mod leave;
 pub mod mute;
@@ -17,6 +20,7 @@ pub mod stop;
 pub mod volume;
 
 pub use deafen::deafen;
+pub use forceplay::forceplay;
 pub use join::join;
 pub use leave::leave;
 pub use mute::mute;

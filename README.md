@@ -109,6 +109,7 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | Command | Aliases | Description |
 | --- | --- | --- |
 | `play <query or url>` | `p`, `enqueue` | Queue a track, playlist or search result; joins your voice channel if the bot is not already in one. |
+| `forceplay <query or url>` | `fp`, `playnow` | Play a track immediately; the interrupted track plays again from the start right after it. Uses only the first track of a playlist. |
 | `join` | | Join your voice channel. |
 | `leave` | `qa!` | Leave the voice channel. |
 | `pause` / `resume` | | Pause or resume the current track. |
