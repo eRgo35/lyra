@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Enqueueing playlists is much faster. YouTube playlist tracks reuse the
+  title, duration, channel and thumbnail from the single `--flat-playlist`
+  call instead of one `yt-dlp` run per track (a 200-track playlist went from
+  over 5 minutes to about 2 seconds); Spotify and search entries are looked
+  up 4 at a time, still enqueued in order (#6).
 - `seek` now does what it says: `90` or `1:30` jumps to that position and
   `+30` / `-15` moves relative to the current one (clamped at the start).
   It reports the new position, or an error when the target is past the end
