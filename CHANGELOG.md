@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `dictionary` shows the word, its phonetic and the first definition per part
+  of speech instead of an empty embed. `dictionary` and `verse` reply with an
+  error for unknown words/verses, API errors and network failures instead of
+  staying silent or panicking, and reuse the shared HTTP client (#28).
 - `play` no longer blocks a runtime worker while `yt-dlp` expands a
   playlist, and replies that `yt-dlp` was not found instead of panicking
   when it is missing. `ai` no longer blocks the runtime for a second (#27).
