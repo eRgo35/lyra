@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI runs `cargo deny check advisories`. Accepted advisories are listed in
   `deny.toml` with their reasons; any new RustSec advisory fails the build.
 
+### Fixed
+
+- `seek`, `volume` and `repeat` reply "Nothing is playing!" instead of
+  panicking when the queue is empty (#26).
+- `queue`, `skip`, `play` and the soundboard commands no longer panic on
+  tracks without a title, artist or source URL; they show placeholder text
+  instead. `skip` on an empty queue no longer underflows (#26).
+
 ### Changed
 
 - `dotenv` 0.15 (unmaintained, RUSTSEC-2021-0141) replaced by its maintained

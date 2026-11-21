@@ -25,7 +25,12 @@ pub async fn seek(
 
         let seek_duration = Duration::from_secs(seek);
 
-        let track = queue.current().unwrap();
+        let Some(track) = queue.current() else {
+            let msg = "Nothing is playing!";
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                .await?;
+            return Ok(());
+        };
         let _ = track.seek(seek_duration);
 
         ctx.send(

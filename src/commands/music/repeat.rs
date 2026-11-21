@@ -32,12 +32,22 @@ pub async fn repeat(
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
 
-        let track = queue.current().unwrap().get_info().await;
-        let is_looped = track.unwrap().loops;
+        let Some(track) = queue.current() else {
+            let msg = "Nothing is playing!";
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                .await?;
+            return Ok(());
+        };
+        let Ok(info) = track.get_info().await else {
+            let msg = "The current track has already finished!";
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                .await?;
+            return Ok(());
+        };
 
-        match is_looped {
+        match info.loops {
             LoopState::Infinite => {
-                let _ = queue.current().unwrap().disable_loop();
+                let _ = track.disable_loop();
 
                 ctx.send(
                     CreateReply::default()
@@ -47,7 +57,7 @@ pub async fn repeat(
             }
             LoopState::Finite(_) => {
                 if times == 0 {
-                    let _ = queue.current().unwrap().disable_loop();
+                    let _ = track.disable_loop();
 
                     ctx.send(
                         CreateReply::default()
@@ -55,10 +65,7 @@ pub async fn repeat(
                     )
                     .await?;
                 } else if times < 100 {
-                    let _ = queue
-                        .current()
-                        .unwrap()
-                        .loop_for(NonMaxU32::new(times as u32).unwrap());
+                    let _ = track.loop_for(NonMaxU32::new(times as u32).unwrap());
                     ctx.send(
                         CreateReply::default().embed(
                             embed(
@@ -73,7 +80,7 @@ pub async fn repeat(
                     )
                     .await?;
                 } else {
-                    let _ = queue.current().unwrap().enable_loop();
+                    let _ = track.enable_loop();
                     ctx.send(
                         CreateReply::default().embed(
                             embed(ctx, "Song looped forever!", "A very long time!", "")

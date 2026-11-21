@@ -100,8 +100,7 @@ async fn generate_embed(ctx: Context<'_>, src: YoutubeDl<'_>) -> Result<CreateEm
             CreateEmbedAuthor::new("Audio output hijacked!").icon_url(ctx.author().clone().face()),
         )
         .colour(Color::from_rgb(255, 58, 97))
-        .title(title.unwrap())
-        .url(source_url.unwrap())
+        .title(title.unwrap_or("Unknown Title".to_string()))
         .thumbnail(thumbnail.unwrap_or(ctx.cache().current_user().face()))
         .field(
             "Artist",
@@ -120,6 +119,11 @@ async fn generate_embed(ctx: Context<'_>, src: YoutubeDl<'_>) -> Result<CreateEm
             CreateEmbedFooter::new(ctx.cache().current_user().name.to_string())
                 .icon_url(ctx.cache().current_user().face()),
         );
+
+    let embed = match source_url {
+        Some(url) => embed.url(url),
+        None => embed,
+    };
 
     Ok(embed)
 }

@@ -18,7 +18,12 @@ pub async fn volume(ctx: Context<'_>, #[description = "Volume"] volume: f32) -> 
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
 
-        let track = queue.current().unwrap();
+        let Some(track) = queue.current() else {
+            let msg = "Nothing is playing!";
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                .await?;
+            return Ok(());
+        };
         let _ = track.set_volume(volume / 100.0);
 
         ctx.send(

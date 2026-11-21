@@ -33,7 +33,7 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
         let _ = queue.clone().skip();
         let track_raw = queue.clone().current_queue();
         let track = track_raw.get(1);
-        let queue_length = queue.len() - 1;
+        let queue_length = queue.len().saturating_sub(1);
 
         let mut response = CreateReply::default().embed(
             embed(ctx, "Skipped!", "The queue is empty!", "")
@@ -82,8 +82,7 @@ async fn generate_embed(
     let embed = CreateEmbed::default()
         .author(CreateEmbedAuthor::new("Skipped!").icon_url(ctx.author().clone().face()))
         .colour(Color::from_rgb(255, 58, 97))
-        .title(title.as_ref().unwrap())
-        .url(source_url.as_ref().unwrap())
+        .title(title.as_deref().unwrap_or("Unknown Title"))
         .thumbnail(
             thumbnail
                 .as_ref()
@@ -106,6 +105,11 @@ async fn generate_embed(
             CreateEmbedFooter::new(ctx.cache().current_user().name.to_string())
                 .icon_url(ctx.cache().current_user().face()),
         );
+
+    let embed = match source_url {
+        Some(url) => embed.url(url),
+        None => embed,
+    };
 
     Ok(embed)
 }

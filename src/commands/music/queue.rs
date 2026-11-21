@@ -47,8 +47,8 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
             queue_res.push_str(&format!(
                 "{}. {} - {} [{:02}:{:02}] \n",
                 index,
-                title.as_ref().unwrap(),
-                artist.as_ref().unwrap(),
+                title.as_deref().unwrap_or("Unknown Title"),
+                artist.as_deref().unwrap_or("Unknown Artist"),
                 duration_minutes,
                 duration_seconds
             ));
