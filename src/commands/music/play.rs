@@ -17,6 +17,7 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
+use tokio::sync::Semaphore;
 use tracing::warn;
 
 /// Plays a song; \
@@ -39,7 +40,7 @@ pub async fn play(
     let http_client = ctx.data().http_client.clone();
     let manager = songbird::get(ctx.serenity_context()).await.unwrap().clone();
 
-    let mut rest_playlist: VecDeque<String> = VecDeque::new();
+    let mut rest_playlist: VecDeque<Entry> = VecDeque::new();
 
     if manager.get(guild_id).is_none() {
         let channel_id = ctx
@@ -86,7 +87,7 @@ async fn handle_play<'a>(
     song: String,
     mut handler: tokio::sync::MutexGuard<'a, Call>,
     http_client: Client,
-) -> Result<VecDeque<String>, Error> {
+) -> Result<VecDeque<Entry>, Error> {
     let mut results = match parse_data(song).await {
         Ok(results) => results,
         Err(e) => {
@@ -109,22 +110,25 @@ async fn handle_play<'a>(
         return Ok(results);
     };
 
-    let src: YoutubeDl = YoutubeDl::new_ytdl_like("yt-dlp", http_client, first);
+    let src: YoutubeDl = YoutubeDl::new_ytdl_like("yt-dlp", http_client, first.query);
 
-    let aux_metadata = match src.clone().aux_metadata().await {
-        Ok(metadata) => metadata,
-        Err(e) => {
-            warn!("Failed to load track metadata: {e}");
-            let msg = "Could not load that track!";
-            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
-                .await?;
-            return Ok(results);
-        }
+    let aux_metadata = match first.metadata {
+        Some(metadata) => metadata,
+        None => match src.clone().aux_metadata().await {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                warn!("Failed to load track metadata: {e}");
+                let msg = "Could not load that track!";
+                ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                    .await?;
+                return Ok(results);
+            }
+        },
     };
 
     ctx.send(
         CreateReply::default().embed(
-            generate_embed(ctx, aux_metadata.clone(), handler.queue(), results.clone()).await?,
+            generate_embed(ctx, aux_metadata.clone(), handler.queue(), results.len()).await?,
         ),
     )
     .await?;
@@ -139,7 +143,22 @@ async fn handle_play<'a>(
     Ok(results)
 }
 
-async fn parse_data(data: String) -> std::io::Result<VecDeque<String>> {
+/// A track to enqueue: the yt-dlp query, plus its metadata when it is already known.
+struct Entry {
+    query: String,
+    metadata: Option<AuxMetadata>,
+}
+
+impl Entry {
+    fn query(query: String) -> Self {
+        Entry {
+            query,
+            metadata: None,
+        }
+    }
+}
+
+async fn parse_data(data: String) -> std::io::Result<VecDeque<Entry>> {
     let mut tracks = VecDeque::new();
 
     for track in spotify_parser::retrieve_async_url(&data)
@@ -152,59 +171,111 @@ async fn parse_data(data: String) -> std::io::Result<VecDeque<String>> {
                 .output()
                 .await?;
 
-            tracks.extend(playlist_urls(&String::from_utf8_lossy(&output.stdout)));
+            tracks.extend(playlist_entries(&String::from_utf8_lossy(&output.stdout)));
         } else if track.starts_with("http") {
-            tracks.push_back(track);
+            tracks.push_back(Entry::query(track));
         } else {
-            tracks.push_back(format!("ytsearch:{}", track));
+            tracks.push_back(Entry::query(format!("ytsearch:{}", track)));
         }
     }
 
     Ok(tracks)
 }
 
-/// Track URLs from `yt-dlp -j --flat-playlist` output (one JSON object per line).
+/// Entries from `yt-dlp -j --flat-playlist` output (one JSON object per line), with
+/// metadata taken from the same output so no per-track yt-dlp call is needed.
 ///
 /// Only `http(s)` URLs are kept: entries are later passed to yt-dlp by songbird without
 /// a `--` separator, so a value starting with `-` would be parsed as an option.
-fn playlist_urls(output: &str) -> Vec<String> {
+fn playlist_entries(output: &str) -> Vec<Entry> {
     output
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .filter_map(|entry| entry.get("url")?.as_str().map(str::to_string))
-        .filter(|url| url.starts_with("http"))
+        .filter_map(|entry| {
+            let url = entry.get("url")?.as_str()?.to_string();
+            if !url.starts_with("http") {
+                return None;
+            }
+
+            let text = |key: &str| entry.get(key)?.as_str().map(str::to_string);
+            let channel = text("channel").or_else(|| text("uploader"));
+            let thumbnail = entry
+                .get("thumbnails")
+                .and_then(|thumbnails| thumbnails.as_array()?.last()?.get("url")?.as_str())
+                .map(str::to_string)
+                .or_else(|| text("thumbnail"));
+
+            let metadata = AuxMetadata {
+                title: text("title"),
+                artist: text("artist").or_else(|| channel.clone()),
+                channel,
+                duration: entry
+                    .get("duration")
+                    .and_then(|d| d.as_f64())
+                    .filter(|d| d.is_finite() && *d >= 0.0)
+                    .map(Duration::from_secs_f64),
+                source_url: Some(url.clone()),
+                thumbnail,
+                ..AuxMetadata::default()
+            };
+
+            Some(Entry {
+                query: url,
+                metadata: Some(metadata),
+            })
+        })
         .collect()
 }
 
+/// How many yt-dlp metadata lookups run at once for entries without known metadata.
+const METADATA_LOOKUPS: usize = 4;
+
 async fn handle_playlist(
-    playlist: VecDeque<String>,
+    playlist: VecDeque<Entry>,
     manager: std::sync::Arc<songbird::Songbird>,
     guild_id: GuildId,
     http_client: Client,
 ) -> Result<(), Error> {
-    for song in playlist {
-        if manager.get(guild_id).is_some() {
-            let handler = manager.get(guild_id).unwrap();
-            let mut handler = handler.lock().await;
+    let lookups = Arc::new(Semaphore::new(METADATA_LOOKUPS));
 
-            let src: YoutubeDl =
-                YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), song.clone());
+    // Start all lookups up front (bounded by the semaphore) but enqueue in playlist order.
+    let pending = playlist
+        .into_iter()
+        .map(|entry| {
+            let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), entry.query.clone());
+            let lookups = lookups.clone();
+            tokio::spawn(async move {
+                let metadata = match entry.metadata {
+                    Some(metadata) => Ok(metadata),
+                    None => {
+                        let _permit = lookups.acquire().await;
+                        src.clone().aux_metadata().await
+                    }
+                };
+                (entry.query, src, metadata)
+            })
+        })
+        .collect::<Vec<_>>();
 
-            let aux_metadata = match src.clone().aux_metadata().await {
-                Ok(metadata) => metadata,
-                Err(e) => {
-                    warn!("Skipping playlist entry {song}: {e}");
-                    continue;
-                }
-            };
+    for lookup in pending {
+        let (query, src, metadata) = lookup.await?;
+        let metadata = match metadata {
+            Ok(metadata) => metadata,
+            Err(e) => {
+                warn!("Skipping playlist entry {query}: {e}");
+                continue;
+            }
+        };
 
-            handler
-                .enqueue(Track::new_with_data(
-                    src.clone().into(),
-                    Arc::new(aux_metadata),
-                ))
-                .await;
-        }
+        // The bot may have left the channel while the playlist was loading.
+        let Some(handler) = manager.get(guild_id) else {
+            break;
+        };
+        handler
+            .lock()
+            .await
+            .enqueue(Track::new_with_data(src.into(), Arc::new(metadata)))
+            .await;
     }
 
     Ok(())
@@ -214,7 +285,7 @@ async fn generate_embed(
     ctx: Context<'_>,
     metadata: AuxMetadata,
     queue: &TrackQueue,
-    results: VecDeque<String>,
+    remaining: usize,
 ) -> Result<CreateEmbed, Error> {
     let AuxMetadata {
         title,
@@ -229,7 +300,7 @@ async fn generate_embed(
     let mut description = format!("Enqueued @ {}", queue.len() + 1);
     let mut tracks = "Tracks enqueued";
 
-    if results.len() == 1 {
+    if remaining == 0 {
         tracks = "Track enqueued";
     }
 
@@ -270,7 +341,15 @@ async fn generate_embed(
 
 #[cfg(test)]
 mod tests {
-    use super::playlist_urls;
+    use super::playlist_entries;
+    use std::time::Duration;
+
+    fn playlist_urls(output: &str) -> Vec<String> {
+        playlist_entries(output)
+            .into_iter()
+            .map(|entry| entry.query)
+            .collect()
+    }
 
     #[test]
     fn playlist_urls_reads_url_field_including_dash_and_underscore_ids() {
@@ -309,5 +388,34 @@ mod tests {
             "\n",
         );
         assert!(playlist_urls(output).is_empty());
+    }
+
+    #[test]
+    fn playlist_entries_carry_metadata_from_flat_playlist_output() {
+        let output = r#"{"url": "https://www.youtube.com/watch?v=kPa7bsKwL-c", "title": "Die With A Smile", "duration": 253.0, "channel": "Lady Gaga", "thumbnails": [{"url": "https://i.ytimg.com/small.jpg"}, {"url": "https://i.ytimg.com/large.jpg"}]}"#;
+        let entries = playlist_entries(output);
+        let metadata = entries[0].metadata.as_ref().unwrap();
+
+        assert_eq!(metadata.title.as_deref(), Some("Die With A Smile"));
+        assert_eq!(metadata.artist.as_deref(), Some("Lady Gaga"));
+        assert_eq!(metadata.duration, Some(Duration::from_secs(253)));
+        assert_eq!(
+            metadata.source_url.as_deref(),
+            Some("https://www.youtube.com/watch?v=kPa7bsKwL-c")
+        );
+        assert_eq!(
+            metadata.thumbnail.as_deref(),
+            Some("https://i.ytimg.com/large.jpg")
+        );
+    }
+
+    #[test]
+    fn playlist_entries_tolerate_missing_metadata_fields() {
+        let entries = playlist_entries(r#"{"url": "https://u", "duration": null}"#);
+        let metadata = entries[0].metadata.as_ref().unwrap();
+
+        assert_eq!(metadata.title, None);
+        assert_eq!(metadata.artist, None);
+        assert_eq!(metadata.duration, None);
     }
 }
