@@ -116,7 +116,7 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `stop` | `end` | Stop playback and clear the queue (the bot stays in the channel). |
 | `queue` | `q` | Show the next tracks in the queue. |
 | `repeat <times>` | `loop`, `while`, `for` | Loop the current track. |
-| `seek <seconds>` | | Seek the current track by the given number of seconds. |
+| `seek <position>` | | Jump to a position (`90`, `1:30`) or move by an offset (`+30`, `-15`) in the current track. |
 | `volume <percent>` | | Set the volume of the current track. |
 | `mute` | `shhh`, `unmute` | Toggle the bot's self-mute. |
 | `deafen` | `shuush`, `undeafen` | Toggle the bot's self-deafen. |
