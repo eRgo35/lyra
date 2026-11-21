@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `seek` now does what it says: `90` or `1:30` jumps to that position and
+  `+30` / `-15` moves relative to the current one (clamped at the start).
+  It reports the new position, or an error when the target is past the end
+  of the track or the track cannot be seeked. Previously it always jumped to
+  the absolute second while claiming to seek "by" it, and ignored failures.
+  The slash option is now text; it is re-registered on startup (globally
+  this can take up to an hour to show up) (#8).
 - `dictionary` shows the word, its phonetic and the first definition per part
   of speech instead of an empty embed. `dictionary` and `verse` reply with an
   error for unknown words/verses, API errors and network failures instead of
