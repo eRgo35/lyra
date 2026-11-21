@@ -5,7 +5,6 @@ use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
 use poise::CreateReply;
-use regex::Regex as Regex_Classic;
 use reqwest::Client;
 use serenity::all::GuildId;
 use songbird::events::TrackEvent;
@@ -18,6 +17,7 @@ use std::collections::VecDeque;
 use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::warn;
 
 /// Plays a song; \
 /// you can search by query or paste an url; \
@@ -63,9 +63,7 @@ pub async fn play(
             let mut handler = handler_lock.lock().await;
             handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
-            rest_playlist = handle_play(ctx, song, handler, http_client.clone())
-                .await
-                .unwrap();
+            rest_playlist = handle_play(ctx, song, handler, http_client.clone()).await?;
         } else {
             let msg = "Failed to join the voice channel!";
             ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
@@ -75,14 +73,10 @@ pub async fn play(
         let handler = manager.get(guild_id).unwrap();
         let mut handler = handler.lock().await;
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
-        rest_playlist = handle_play(ctx, song, handler, http_client.clone())
-            .await
-            .unwrap();
+        rest_playlist = handle_play(ctx, song, handler, http_client.clone()).await?;
     }
 
-    handle_playlist(rest_playlist, manager, guild_id, http_client)
-        .await
-        .unwrap();
+    handle_playlist(rest_playlist, manager, guild_id, http_client).await?;
 
     Ok(())
 }
@@ -95,19 +89,32 @@ async fn handle_play<'a>(
 ) -> Result<VecDeque<String>, Error> {
     let mut results = parse_data(song).await;
 
-    let src: YoutubeDl =
-        YoutubeDl::new_ytdl_like("yt-dlp", http_client, results.pop_front().unwrap());
+    let Some(first) = results.pop_front() else {
+        let msg = "No tracks found!";
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+            .await?;
+        return Ok(results);
+    };
+
+    let src: YoutubeDl = YoutubeDl::new_ytdl_like("yt-dlp", http_client, first);
+
+    let aux_metadata = match src.clone().aux_metadata().await {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            warn!("Failed to load track metadata: {e}");
+            let msg = "Could not load that track!";
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                .await?;
+            return Ok(results);
+        }
+    };
 
     ctx.send(
         CreateReply::default().embed(
-            generate_embed(ctx, src.clone(), handler.queue(), results.clone())
-                .await
-                .unwrap(),
+            generate_embed(ctx, aux_metadata.clone(), handler.queue(), results.clone()).await?,
         ),
     )
     .await?;
-
-    let aux_metadata = src.clone().aux_metadata().await.unwrap();
 
     handler
         .enqueue(Track::new_with_data(
@@ -126,23 +133,13 @@ async fn parse_data(data: String) -> VecDeque<String> {
         .iter()
         .flat_map(|track| {
             if track.contains("?list=") {
-                let regex_youtube = Regex_Classic::new(
-                    r#""url": "(https://www.youtube.com/watch\?v=[A-Za-z0-9]{11})""#,
-                )
-                .unwrap();
-
                 let list = Command::new("yt-dlp")
-                    .args(["--username", "oauth2", "--password", "''"])
                     .args(["-j", "--flat-playlist", track])
                     .output()
                     .expect("Failed to execute process")
                     .stdout;
-                let list = String::from_utf8(list).unwrap();
 
-                regex_youtube
-                    .captures_iter(&list)
-                    .map(|capture| capture.get(1).unwrap().as_str().to_string())
-                    .collect::<Vec<String>>()
+                playlist_urls(&String::from_utf8_lossy(&list))
             } else if track.starts_with("http") {
                 vec![track.clone()]
             } else {
@@ -152,6 +149,15 @@ async fn parse_data(data: String) -> VecDeque<String> {
         .collect();
 
     tracks
+}
+
+/// Track URLs from `yt-dlp -j --flat-playlist` output (one JSON object per line).
+fn playlist_urls(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter_map(|entry| entry.get("url")?.as_str().map(str::to_string))
+        .collect()
 }
 
 async fn handle_playlist(
@@ -168,7 +174,13 @@ async fn handle_playlist(
             let src: YoutubeDl =
                 YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), song.clone());
 
-            let aux_metadata = src.clone().aux_metadata().await.unwrap();
+            let aux_metadata = match src.clone().aux_metadata().await {
+                Ok(metadata) => metadata,
+                Err(e) => {
+                    warn!("Skipping playlist entry {song}: {e}");
+                    continue;
+                }
+            };
 
             handler
                 .enqueue(Track::new_with_data(
@@ -184,11 +196,10 @@ async fn handle_playlist(
 
 async fn generate_embed(
     ctx: Context<'_>,
-    src: YoutubeDl<'_>,
+    metadata: AuxMetadata,
     queue: &TrackQueue,
     results: VecDeque<String>,
 ) -> Result<CreateEmbed, Error> {
-    let metadata = src.clone().aux_metadata().await.unwrap();
     let AuxMetadata {
         title,
         thumbnail,
@@ -239,4 +250,35 @@ async fn generate_embed(
     };
 
     Ok(embed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::playlist_urls;
+
+    #[test]
+    fn playlist_urls_reads_url_field_including_dash_and_underscore_ids() {
+        let output = concat!(
+            r#"{"_type": "url", "ie_key": "Youtube", "id": "kPa7bsKwL-c", "url": "https://www.youtube.com/watch?v=kPa7bsKwL-c"}"#,
+            "\n",
+            r#"{"_type": "url", "id": "a_b-c_d-e_f", "url": "https://music.youtube.com/watch?v=a_b-c_d-e_f"}"#,
+            "\n",
+        );
+        assert_eq!(
+            playlist_urls(output),
+            vec![
+                "https://www.youtube.com/watch?v=kPa7bsKwL-c",
+                "https://music.youtube.com/watch?v=a_b-c_d-e_f",
+            ]
+        );
+    }
+
+    #[test]
+    fn playlist_urls_skips_non_json_and_entries_without_url() {
+        assert!(playlist_urls("").is_empty());
+        assert_eq!(
+            playlist_urls("WARNING: something\n{\"id\": \"x\"}\n{\"url\": \"u\"}\n"),
+            vec!["u"]
+        );
+    }
 }
