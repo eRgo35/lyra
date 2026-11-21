@@ -1,0 +1,21 @@
+# Used by CI: `cargo deny check advisories`.
+# Every ignored advisory is transitive and has no available fix; reasons and
+# reachability analysis: docs/research/2026-10-20-dependency-blockers.md (sections C, E, F).
+# Anything not listed here fails CI.
+
+[advisories]
+ignore = [
+    # Vulnerabilities
+    { id = "RUSTSEC-2026-0293", reason = "ringbuf 0.4.8 via songbird; Consumer::skip is used only on HeapCons<u8>, whose element Drop cannot panic (E)" },
+    { id = "RUSTSEC-2026-0207", reason = "libcrux-sha3 0.0.8 pinned by hpke-rs 0.6.1; affected incremental SHAKE squeeze is never called (C)" },
+    { id = "RUSTSEC-2026-0208", reason = "libcrux-sha3 0.0.8 pinned by hpke-rs 0.6.1; AVX2 x4 shake256 is never called (C)" },
+    { id = "RUSTSEC-2026-0212", reason = "libcrux-secrets 0.0.5 pinned by libcrux-traits; aarch64-only code, release target is x86_64 (C)" },
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5.5 via davey -> p256; needs a local side-channel observer, DAVE keys are per-session; fix only in 0.7.x, blocked on davey/openmls 0.9 (F)" },
+    # Unmaintained, no fix available upstream
+    { id = "RUSTSEC-2024-0388", reason = "derivative, via songbird (E)" },
+    { id = "RUSTSEC-2025-0057", reason = "fxhash, via spotify-parser -> scraper (E)" },
+    { id = "RUSTSEC-2024-0384", reason = "instant, via songbird -> davey -> openmls (E)" },
+    { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2, build-time only, via libcrux (E)" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono, via serenity and songbird (F)" },
+    { id = "RUSTSEC-2026-0441", reason = "pin-utils, via songbird -> davey -> openmls (F)" },
+]

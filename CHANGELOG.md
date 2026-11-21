@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CI runs `cargo deny check advisories`. Accepted advisories are listed in
+  `deny.toml` with their reasons; any new RustSec advisory fails the build.
+
 ### Changed
 
 - `dotenv` 0.15 (unmaintained, RUSTSEC-2021-0141) replaced by its maintained
