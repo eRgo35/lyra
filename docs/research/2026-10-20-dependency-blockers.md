@@ -184,3 +184,35 @@ Effect of the steps on `cargo audit` **[run]**, each in an isolated scratch copy
 ## Priority list
 
 1. `cargo update` (lock only), changelog entry. 2. Release spotify-parser 1.0.2, bump in lyra. 3. Serenity one-line patch on a fork we control (A, Exp. 1). 4. Dismiss #36 as not used (C); optionally `dotenv` → `dotenvy`. 5. Track serenity 0.13 / poise 0.8 / songbird 0.7 and davey ≥ 0.2 (openmls 0.9) for the rest.
+
+---
+
+## F. Re-check 2026-11-21 (for the CI advisory gate, #29)
+
+`cargo deny check advisories` (0.20.2, advisory-db HEAD `55e1c3d`, 2026-11-21) against `senpai` @ `4d908ef`
+(serenity fork patch and `dotenvy` already in). Tags as above.
+
+**Gone since E:** RUSTSEC-2026-0381. The advisory was amended to `unaffected = ["= 0.26.11"]`; webpki-roots
+0.26.11 is a semver-compat shim whose only dependency is `webpki-roots 1.0.10` (`cargo tree -p webpki-roots@0.26.11`)
+**[run]**, which carries the patched root list. `dotenv` (RUSTSEC-2021-0141) is gone with the `dotenvy` swap.
+
+**Still present, reasons unchanged from E/C:** RUSTSEC-2026-0293 (ringbuf), -0207 / -0208 (libcrux-sha3), -0212
+(libcrux-secrets), unmaintained -2024-0388 (derivative), -2025-0057 (fxhash), -2024-0384 (instant), -2026-0173
+(proc-macro-error2).
+
+**New since E:**
+
+| Advisory | Crate | Path | Reachable? | Fix |
+|---|---|---|---|---|
+| RUSTSEC-2026-0387 (2026-10-23), timing variability in "constant-time" subtraction, zero counting, division, Montgomery multiplication | crypto-bigint 0.5.5 | songbird 0.6.1 → davey 0.1.5 → p256 0.13.2 / hpke-rs-rust-crypto 0.6.1 → elliptic-curve 0.13.8 → crypto-bigint | **In principle.** p256 `Scalar::sub` is `U256::sub_mod` (`p256/src/arithmetic/scalar.rs:110`) **[src]**, used on secret scalars in ECDSA signing. davey signs MLS messages with a P-256 key that songbird creates fresh per DAVE voice session (`DaveSession::new(.., None)` at `songbird/src/driver/connection/mod.rs:378` and `tasks/ws.rs:481`; "If no key pair is passed, one will be generated") **[src]**. Exploiting it needs a timing/microarchitectural observer on the bot's host and depends on what the compiler emits for x86_64 **[inf]**; an observer that close can read process memory anyway. Keys are short-lived. | Patched only in `>= 0.7.6`; no 0.5.x release after 0.5.5 (crates.io) **[run]**. Needs the elliptic-curve 0.14 / p256 0.14 line, i.e. davey → openmls ≥ 0.9 (same blocker as C). |
+| RUSTSEC-2026-0543 (unmaintained) | chrono 0.4.45 | serenity 0.12.5, songbird → serde-aux | n/a (informational, no vulnerability) | upstream (serenity 0.13) |
+| RUSTSEC-2026-0441 (unmaintained, repo archived 2026-10-01) | pin-utils 0.1.1 | songbird → davey → openmls 0.8.2 → fluvio-wasm-timer | n/a (informational; macro-only crate) | upstream (openmls ≥ 0.9) |
+
+Lyra does not use chrono or pin-utils directly **[run]**.
+
+### Recommendation
+
+Accept all three in `deny.toml` alongside the E list. 0387 is the only one with a real (local side-channel)
+attack; it is accepted as tolerable for a self-hosted bot with ephemeral voice keys and re-evaluated with the
+davey/openmls bump that also clears the libcrux set. Do not keep 0381 on the ignore list: cargo-deny would
+warn `advisory-not-detected`.

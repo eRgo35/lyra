@@ -28,3 +28,13 @@ jobs:
       run: cargo build --locked --verbose
     - name: Run tests
       run: cargo test --locked --verbose
+
+  advisories:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Dependency advisories
+      uses: EmbarkStudios/cargo-deny-action@v2
+      with:
+        command: check advisories

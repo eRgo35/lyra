@@ -25,7 +25,11 @@ cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo build --locked
 cargo test --locked
+cargo deny check advisories
 ```
+
+`cargo deny check advisories` (install with `cargo install cargo-deny`) fails on any RustSec
+advisory not accepted in [`deny.toml`](deny.toml); add new exceptions there with a reason.
 
 Use `cargo fmt` to fix formatting. Please add or update unit tests for logic that can be tested
 without a Discord connection.
