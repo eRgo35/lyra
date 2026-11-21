@@ -4,6 +4,7 @@ use crate::{
 };
 use poise::CreateReply;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 use url::form_urlencoded;
 
 /// Reference Bible by verse
@@ -19,28 +20,25 @@ pub async fn verse(
 ) -> Result<(), Error> {
     let data: String = form_urlencoded::byte_serialize(verse.as_bytes()).collect();
     let translation = if latin { "clementine" } else { "web" };
-    let client = reqwest::Client::new();
-    let response = client
+    let response = ctx
+        .data()
+        .http_client
         .get(format!(
             "https://bible-api.com/{}?translation={}",
             data, translation
         ))
         .send()
-        .await
-        .unwrap();
+        .await;
 
-    match response.status() {
-        reqwest::StatusCode::OK => {
-            match response.json::<APIResponse>().await {
+    let error = match response {
+        Err(e) => {
+            warn!("Bible API request failed: {e}");
+            "Could not reach the Bible API!".to_string()
+        }
+        Ok(response) => match response.status() {
+            reqwest::StatusCode::OK => match response.json::<APIResponse>().await {
+                Ok(parsed) if parsed.text.len() > 4000 => "Quoted text is too long!".to_string(),
                 Ok(parsed) => {
-                    if parsed.text.len() > 4000 {
-                        ctx.send(
-                            CreateReply::default()
-                                .embed(error_embed(ctx, "Quoted text is too long!").await.unwrap()),
-                        )
-                        .await?;
-                        return Ok(());
-                    }
                     ctx.send(
                         CreateReply::default().embed(
                             embed(
@@ -49,22 +47,27 @@ pub async fn verse(
                                 &parsed.text,
                                 &parsed.reference,
                             )
-                            .await
-                            .unwrap(),
+                            .await?,
                         ),
                     )
                     .await?;
+                    return Ok(());
                 }
-                Err(err) => println!("Something is messed up! {:?}", err),
-            };
-        }
-        reqwest::StatusCode::UNAUTHORIZED => {
-            println!("Unauthorized.. Uoops!!");
-        }
-        error => {
-            println!("Something went wrong: {:?}", error);
-        }
-    }
+                Err(e) => {
+                    warn!("Could not parse Bible API response: {e}");
+                    "Could not read the Bible API response!".to_string()
+                }
+            },
+            reqwest::StatusCode::NOT_FOUND => format!("Verse \"{}\" not found!", verse),
+            status => {
+                warn!("Bible API returned {status}");
+                format!("The Bible API returned an error ({status})!")
+            }
+        },
+    };
+
+    ctx.send(CreateReply::default().embed(error_embed(ctx, &error).await?))
+        .await?;
 
     Ok(())
 }
