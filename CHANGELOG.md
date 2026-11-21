@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `play` no longer blocks a runtime worker while `yt-dlp` expands a
+  playlist, and replies that `yt-dlp` was not found instead of panicking
+  when it is missing. `ai` no longer blocks the runtime for a second (#27).
 - YouTube and YouTube Music playlist links work again. The removed yt-dlp
   OAuth login is no longer passed, every entry is read from yt-dlp's JSON
   (video IDs with `-`/`_` and `music.youtube.com` links were previously
@@ -31,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- `play` text containing `?list=` could be read by `yt-dlp` as a command-line
+  option; it is now always passed after `--`. Playlist entries are only
+  enqueued if they are `http(s)` URLs, since songbird passes them to
+  `yt-dlp` without a separator.
 - `serenity` 0.12.5 is now taken from a one-line fork
   ([`eRgo35/serenity`](https://github.com/eRgo35/serenity), branch
   `lyra/tokio-tungstenite-0.23`, rev `c897f7d`) through `[patch.crates-io]`.
