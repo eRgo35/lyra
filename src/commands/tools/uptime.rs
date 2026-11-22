@@ -23,35 +23,15 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 
 /// "I have been awake for …", naming only the largest non-zero unit.
 fn uptime_message(uptime: std::time::Duration) -> String {
-    let (days, hours, minutes, seconds) = (
-        uptime.as_secs() / 86400,
-        (uptime.as_secs() / 3600) % 24,
-        (uptime.as_secs() / 60) % 60,
-        uptime.as_secs() % 60,
-    );
-
-    let mut message = format!(
-        "I have been awake for {} days, {} hours, {} minutes and {} seconds!",
-        days, hours, minutes, seconds
-    );
-
-    if days != 0 {
-        message = format!("I have been awake for {} days!", days);
-    }
-
-    if days == 0 && hours != 0 {
-        message = format!("I have been awake for {} hours!", hours);
-    }
-
-    if days == 0 && hours == 0 && minutes != 0 {
-        message = format!("I have been awake for {} minutes!", minutes);
-    }
-
-    if days == 0 && hours == 0 && minutes == 0 && seconds != 0 {
-        message = format!("I have been awake for {} seconds!", seconds);
-    }
-
-    message
+    let secs = uptime.as_secs();
+    let (amount, unit) = match secs {
+        86400.. => (secs / 86400, "day"),
+        3600.. => (secs / 3600, "hour"),
+        60.. => (secs / 60, "minute"),
+        _ => (secs, "second"),
+    };
+    let plural = if amount == 1 { "" } else { "s" };
+    format!("I have been awake for {amount} {unit}{plural}!")
 }
 
 #[cfg(test)]
@@ -64,15 +44,16 @@ mod tests {
         let msg = |s| uptime_message(Duration::from_secs(s));
         assert_eq!(msg(3 * 86400 + 5), "I have been awake for 3 days!");
         assert_eq!(msg(2 * 3600 + 59), "I have been awake for 2 hours!");
-        assert_eq!(msg(61), "I have been awake for 1 minutes!");
+        assert_eq!(msg(61), "I have been awake for 1 minute!");
+        assert_eq!(msg(86400), "I have been awake for 1 day!");
         assert_eq!(msg(7), "I have been awake for 7 seconds!");
     }
 
     #[test]
-    fn zero_uptime_lists_all_units() {
+    fn zero_uptime_is_zero_seconds() {
         assert_eq!(
             uptime_message(Duration::ZERO),
-            "I have been awake for 0 days, 0 hours, 0 minutes and 0 seconds!"
+            "I have been awake for 0 seconds!"
         );
     }
 }
