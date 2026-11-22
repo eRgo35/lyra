@@ -64,6 +64,7 @@ async fn main() {
         music::deafen(),
         music::forceplay(),
         music::join(),
+        music::jump(),
         music::leave(),
         music::mute(),
         music::pause(),

@@ -114,6 +114,7 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `leave` | `qa!` | Leave the voice channel. |
 | `pause` / `resume` | | Pause or resume the current track. |
 | `skip` | `skipper:` | Skip the current track. |
+| `jump <position>` | `j` | Skip to a queue position as numbered by `queue` (1 = next track); the tracks before it are dropped. |
 | `stop` | `end` | Stop playback and clear the queue (the bot stays in the channel). |
 | `queue` | `q` | Show the next tracks in the queue. |
 | `repeat <times>` | `loop`, `while`, `for` | Loop the current track. |

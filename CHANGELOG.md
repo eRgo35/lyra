@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `jump <position>` (`j`) skips to a queue position as numbered by `queue`,
+  dropping the tracks before it (#10).
 - `forceplay` (`fp`, `playnow`) plays a track immediately; the interrupted
   track is queued right after it and restarts from the beginning. Only the
   first track of a playlist is used (#5).
