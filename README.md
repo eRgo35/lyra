@@ -144,6 +144,8 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `help [command]` | `huh`, `welp` | List commands, or show details for one. |
 | `ping` | | Reply with the response time. |
 | `uptime` | | How long the bot has been running. |
+| `remind [dm] <when> <text>` | | Remind you after `10m`, `2h30m`, `1d`, `1w`… (up to a year): pings you here, or sends a DM with `dm`. Slash form: `/remind set`. Survives restarts. |
+| `remind list` / `remind cancel <id>` | | Your pending reminders (up to 25), and cancelling one by its number. |
 | `userinfo [user]` | `whoami`, `user` | Account age, ID and avatar; in a server also nickname, join date, boosting and roles. |
 | `serverinfo` | `guildinfo`, `server` | Owner, creation date, members, channels, roles, emojis and boosts. |
 | `posix` | | Current time as milliseconds since the Unix epoch. |
@@ -219,7 +221,7 @@ docker compose logs -f                               # watch it connect
 - **Update:** `docker compose pull && docker compose up -d`
 - **Build from your checkout instead** (e.g. on `arm64`, or to run unreleased changes):
   `docker compose up -d --build`
-- Soundboard sounds are kept in the `lyra-data` volume, so they survive updates.
+- Soundboard sounds and reminders are kept in the `lyra-data` volume, so they survive updates.
 - `restart: unless-stopped` brings it back after crashes and reboots (enable the Docker service
   itself with `systemctl enable docker`). Logs are rotated at 3 × 10 MB.
 
@@ -238,7 +240,7 @@ journalctl -u lyra -f
 The script installs the binary to `/usr/local/bin/lyra`, creates a `lyra` system user, writes
 `/etc/lyra/lyra.env` (mode `0600`, only if missing) and installs
 [`deploy/systemd/lyra.service`](deploy/systemd/lyra.service), which restarts on failure and runs
-sandboxed. Soundboard sounds are stored in `/var/lib/lyra/data`. Re-run it to update. You install `yt-dlp` yourself; the script warns if it is missing
+sandboxed. Soundboard sounds and reminders are stored in `/var/lib/lyra/data`. Re-run it to update. You install `yt-dlp` yourself; the script warns if it is missing
 and prints the command for the self-updating standalone binary.
 
 [`scripts/launch.sh`](scripts/launch.sh) (`nohup ./lyra &`) is fine for a quick test, but it does

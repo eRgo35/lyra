@@ -10,6 +10,8 @@ use tracing::{error, info, warn};
 
 pub mod commands;
 pub mod http;
+pub mod reminders;
+pub mod storage;
 
 use crate::commands::fun;
 use crate::commands::music;
@@ -19,14 +21,16 @@ use crate::http::HttpKey;
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
-/// Where custom soundboard sounds are kept, relative to the working directory
+/// Where soundboard sounds and reminders are kept, relative to the working directory
 /// (a volume in Docker, `/var/lib/lyra` under systemd).
 pub const SOUNDBOARD_DIR: &str = "data/soundboard";
+pub const REMINDERS_FILE: &str = "data/reminders.json";
 
 pub struct Data {
     pub http_client: HttpClient,
     pub repeat_all: std::sync::Arc<music::repeat_all::RepeatAll>,
     pub sounds: music::soundboard::store::SoundStore,
+    pub reminders: Arc<reminders::Reminders>,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -89,6 +93,7 @@ pub fn commands() -> Vec<poise::Command<Data, Error>> {
         tools::posix(),
         tools::qr(),
         tools::register(),
+        tools::remind(),
         tools::serverinfo(),
         tools::taf(),
         tools::uptime(),
@@ -173,10 +178,14 @@ pub async fn build_client(
                     poise::builtins::register_globally(ctx, commands).await?;
                 }
 
+                let reminders = Arc::new(reminders::Reminders::load(REMINDERS_FILE).await);
+                tokio::spawn(reminders.clone().run(ctx.http.clone()));
+
                 Ok(Data {
                     http_client: data_http_client,
                     repeat_all: Default::default(),
                     sounds: music::soundboard::store::SoundStore::new(SOUNDBOARD_DIR),
+                    reminders,
                 })
             })
         })

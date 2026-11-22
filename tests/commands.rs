@@ -172,3 +172,31 @@ fn help_listing_fits_in_one_embed() {
     assert!(length <= 4096, "help is {length} characters");
     eprintln!("help listing: {length} characters");
 }
+
+#[test]
+fn remind_is_a_slash_group_with_set_list_and_cancel() {
+    let remind = slash_definitions()
+        .into_iter()
+        .find(|c| c["name"] == "remind")
+        .expect("remind is registered");
+    let options = remind["options"].as_array().unwrap();
+    let names: Vec<_> = options
+        .iter()
+        .map(|o| o["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["set", "list", "cancel"]);
+    // type 1 = subcommand; `set` takes when and text (required) before the dm flag.
+    assert!(options.iter().all(|o| o["type"] == 1));
+    let set: Vec<_> = options[0]["options"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| {
+            (
+                o["name"].as_str().unwrap(),
+                o["required"].as_bool().unwrap_or(false),
+            )
+        })
+        .collect();
+    assert_eq!(set, [("when", true), ("text", true), ("dm", false)]);
+}
