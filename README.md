@@ -156,6 +156,13 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `whois <domain>` | | Domain registrar, dates, status and name servers (RDAP). |
 | `ip <address or hostname>` | | Network, owner, country and abuse contact for a public IP (RDAP). Private addresses are refused. |
 
+### Minecraft
+
+| Command | Aliases | Description |
+| --- | --- | --- |
+| `mcstatus <server>` | | Whether a Java server is online, its MOTD, player count and version ([mcsrvstat.us](https://mcsrvstat.us)), e.g. `mcstatus 2b2t.org`. |
+| `mcplayer <name>` | | A player's UUID, head and skin render (Mojang API, [mc-heads.net](https://mc-heads.net)). |
+
 ### Fun
 
 | Command | Aliases | Description |

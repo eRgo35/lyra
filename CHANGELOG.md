@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Minecraft: `mcstatus <server>` (online, MOTD, players, version via
+  mcsrvstat.us) and `mcplayer <name>` (UUID, head and skin render).
+
 ## [0.12.0] - 2026-11-22
 
 ### Added

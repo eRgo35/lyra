@@ -80,6 +80,8 @@ pub fn commands() -> Vec<poise::Command<Data, Error>> {
         tools::dictionary(),
         tools::help(),
         tools::ip(),
+        tools::mcplayer(),
+        tools::mcstatus(),
         tools::metar(),
         tools::owoify(),
         tools::ping(),

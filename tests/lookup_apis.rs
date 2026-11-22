@@ -272,3 +272,94 @@ async fn lyrics_pick_the_first_result_with_lyrics() {
         Err("No lyrics found for \"zzqq\"!".to_string())
     );
 }
+
+#[tokio::test]
+async fn mcstatus_online_and_offline() {
+    use lyra::commands::tools::mcstatus::fetch_status;
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/3/play.example.net"))
+        .respond_with(json(
+            200,
+            r#"{"online": true, "hostname": "play.example.net", "version": "1.21.4",
+                "software": "Paper",
+                "motd": {"clean": ["  A `fine` server  ", "Join us"]},
+                "players": {"online": 2, "max": 20, "list": [{"name": "Alex"}, {"name": "Steve"}]}}"#,
+        ))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/3/down.example.net:25566"))
+        .respond_with(json(200, r#"{"online": false, "ip": "1.2.3.4"}"#))
+        .mount(&server)
+        .await;
+    let client = reqwest::Client::new();
+
+    let card = fetch_status(&client, &server.uri(), "Play.Example.net")
+        .await
+        .unwrap();
+    assert_eq!(card.title, "play.example.net");
+    assert_eq!(
+        card.description,
+        "🟢 Online\n```\nA 'fine' server\nJoin us\n```\n**Players:** 2 / 20\n\
+         **Online now:** Alex, Steve\n**Version:** Paper 1.21.4"
+    );
+    assert_eq!(
+        card.thumbnail,
+        Some(format!("{}/icon/play.example.net", server.uri()))
+    );
+
+    let card = fetch_status(&client, &server.uri(), "down.example.net:25566")
+        .await
+        .unwrap();
+    assert!(
+        card.description.starts_with("🔴 Offline"),
+        "{}",
+        card.description
+    );
+    assert!(fetch_status(&client, &server.uri(), "bad host")
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn mcplayer_found_and_missing() {
+    use lyra::commands::tools::mcplayer::fetch_player;
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/users/profiles/minecraft/notch"))
+        .respond_with(json(
+            200,
+            r#"{"id": "069a79f444e94726a5befca90e38aaf5", "name": "Notch"}"#,
+        ))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/users/profiles/minecraft/nobody_here"))
+        .respond_with(json(
+            404,
+            r#"{"errorMessage": "Couldn't find any profile"}"#,
+        ))
+        .mount(&server)
+        .await;
+    let client = reqwest::Client::new();
+
+    let card = fetch_player(&client, &server.uri(), "https://heads", "notch")
+        .await
+        .unwrap();
+    assert_eq!(card.title, "Notch");
+    assert_eq!(
+        card.description,
+        "**UUID:** `069a79f4-44e9-4726-a5be-fca90e38aaf5`\n\
+         [Download skin](https://heads/skin/069a79f444e94726a5befca90e38aaf5)"
+    );
+    assert_eq!(
+        card.image.as_deref(),
+        Some("https://heads/body/069a79f444e94726a5befca90e38aaf5")
+    );
+
+    assert_eq!(
+        fetch_player(&client, &server.uri(), "https://heads", "nobody_here").await,
+        Err("There is no Minecraft player called nobody_here!".to_string())
+    );
+}

@@ -52,15 +52,42 @@ pub async fn get_json<T: DeserializeOwned>(
     }
 }
 
-/// Replies with an embed (`author`, then the `(title, description)` of a result) or
-/// the error message.
+/// What a lookup shows: an embed title and description, optionally with images.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Card {
+    pub title: String,
+    pub description: String,
+    pub thumbnail: Option<String>,
+    pub image: Option<String>,
+}
+
+impl From<(String, String)> for Card {
+    fn from((title, description): (String, String)) -> Self {
+        Card {
+            title,
+            description,
+            ..Card::default()
+        }
+    }
+}
+
+/// Replies with an embed (`author`, then the card) or the error message.
 pub async fn reply(
     ctx: Context<'_>,
     author: &str,
-    result: Result<(String, String), String>,
+    result: Result<impl Into<Card>, String>,
 ) -> Result<(), Error> {
-    let embed = match result {
-        Ok((title, description)) => embed(ctx, author, &description, &title).await?,
+    let embed = match result.map(Into::into) {
+        Ok(card) => {
+            let mut embed = embed(ctx, author, &card.description, &card.title).await?;
+            if let Some(thumbnail) = card.thumbnail {
+                embed = embed.thumbnail(thumbnail);
+            }
+            if let Some(image) = card.image {
+                embed = embed.image(image);
+            }
+            embed
+        }
         Err(message) => error_embed(ctx, &message).await?,
     };
     ctx.send(CreateReply::default().embed(embed)).await?;
