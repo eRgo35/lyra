@@ -19,7 +19,8 @@ Releases are cut by hand and built by [cargo-dist](https://opensource.axo.dev/ca
    `x86_64-unknown-linux-gnu`, the shell installer and checksums, and creates
    the GitHub Release.
 5. The same tag triggers `Docker image` (`.github/workflows/docker.yml`), which
-   pushes `ghcr.io/ergo35/lyra:X.Y.Z`, `:X.Y` and `:latest`. The first time,
+   builds `amd64` and `arm64` natively and pushes the multi-arch
+   `ghcr.io/ergo35/lyra:X.Y.Z`, `:X.Y` and `:latest`. The first time,
    make the package public under the repository's *Packages* settings so
    `docker compose pull` works without logging in.
 

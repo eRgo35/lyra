@@ -209,7 +209,7 @@ Two ways to keep Lyra running, restarted on crashes and on boot. Both start from
 
 The image includes everything Lyra needs: `yt-dlp` (updated automatically on every start, since
 YouTube changes often), `deno` (the JavaScript runtime `yt-dlp` uses for YouTube) and `ffmpeg`.
-It is published to `ghcr.io/ergo35/lyra` for every release (`x86_64`).
+It is published to `ghcr.io/ergo35/lyra` for every release (`x86_64` and `arm64`).
 
 ```bash
 git clone https://github.com/eRgo35/lyra && cd lyra   # or just download compose.yaml and .env.example
@@ -219,7 +219,7 @@ docker compose logs -f                               # watch it connect
 ```
 
 - **Update:** `docker compose pull && docker compose up -d`
-- **Build from your checkout instead** (e.g. on `arm64`, or to run unreleased changes):
+- **Build from your checkout instead** (e.g. to run unreleased changes):
   `docker compose up -d --build`
 - Soundboard sounds and reminders are kept in the `lyra-data` volume, so they survive updates.
 - `restart: unless-stopped` brings it back after crashes and reboots (enable the Docker service
