@@ -52,7 +52,7 @@ pub async fn effect(
             song = format!("ytsearch:{}", song);
         }
 
-        let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, song);
+        let src = crate::http::ytdl(http_client, song);
         let embed = generate_embed(ctx, src.clone()).await;
         let response = CreateReply::default().embed(embed.unwrap());
         ctx.send(response).await?;

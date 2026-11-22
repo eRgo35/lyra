@@ -97,6 +97,7 @@ Lyra reads its settings from the environment. A `.env` file in the working direc
 | `PREFIX` | yes | Prefix for text commands, e.g. `!`. Also shown in the bot's "Listening to `<prefix>help`" status. |
 | `GUILD_ID` | no | Register slash commands in this one guild (updates are instant). If unset they are registered globally, which Discord may take up to an hour to propagate. A value that is not a number is a startup error. |
 | `DETAILED_ERRORS` | no | `true` to add the underlying error (e.g. yt-dlp's message) to error replies, for diagnosing problems. Off by default, since it can expose internal details. |
+| `MEDIA_PROXY` | no | HTTP proxy URL (e.g. `http://10.0.0.2:8888`) for music: yt-dlp and the audio stream both go through it, since YouTube only serves a stream to the IP that resolved it. Use it when YouTube blocks the server's IP with "Sign in to confirm you're not a bot", with a proxy on a connection YouTube doesn't block (e.g. at home). Lookups don't use it. |
 | `RUST_LOG` | no | Log filter for `tracing` (e.g. `info`, `lyra=debug`). When unset, only errors are logged, so set `RUST_LOG=info` to see connection and command logs. |
 
 No other API keys are used. The `dictionary`, `qr` and `verse` commands call free public

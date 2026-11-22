@@ -27,7 +27,10 @@ pub const SOUNDBOARD_DIR: &str = "data/soundboard";
 pub const REMINDERS_FILE: &str = "data/reminders.json";
 
 pub struct Data {
+    /// For lookups (`weather`, `whois`, ...).
     pub http_client: HttpClient,
+    /// For music: yt-dlp sources stream through it (`MEDIA_PROXY`).
+    pub media_client: HttpClient,
     pub repeat_all: std::sync::Arc<music::repeat_all::RepeatAll>,
     pub sounds: music::soundboard::store::SoundStore,
     pub reminders: Arc<reminders::Reminders>,
@@ -136,7 +139,8 @@ pub async fn build_client(
     guild_id: Option<u64>,
 ) -> Result<serenity::Client, Error> {
     let http_client = HttpClient::new();
-    let data_http_client = http_client.clone();
+    let media_client = http::media_client()?;
+    let data_media_client = media_client.clone();
 
     let options = poise::FrameworkOptions {
         commands: commands(),
@@ -196,7 +200,8 @@ pub async fn build_client(
                 tokio::spawn(reminders.clone().run(ctx.http.clone()));
 
                 Ok(Data {
-                    http_client: data_http_client,
+                    http_client,
+                    media_client: data_media_client,
                     repeat_all: Default::default(),
                     sounds: music::soundboard::store::SoundStore::new(SOUNDBOARD_DIR),
                     reminders,
@@ -212,7 +217,7 @@ pub async fn build_client(
     serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .register_songbird()
-        .type_map_insert::<HttpKey>(http_client)
+        .type_map_insert::<HttpKey>(media_client)
         .await
         .map_err(Into::into)
 }
