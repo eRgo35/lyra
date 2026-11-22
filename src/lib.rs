@@ -38,6 +38,20 @@ async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot {:?}", error),
         poise::FrameworkError::Command { error, ctx, .. } => {
             warn!("Error in command `{}`: {:?}", ctx.command().name, error);
+            // Without a reply, a slash command shows "The application did not respond".
+            let msg =
+                commands::embeds::with_detail("Something went wrong running that command!", &error);
+            let reply = match commands::embeds::error_embed(ctx, &msg).await {
+                Ok(embed) => ctx
+                    .send(poise::CreateReply::default().embed(embed))
+                    .await
+                    .map(drop)
+                    .map_err(Error::from),
+                Err(e) => Err(e),
+            };
+            if let Err(e) = reply {
+                warn!("Could not report the error to the user: {e}");
+            }
         }
         error => {
             if let Err(e) = poise::builtins::on_error(error).await {

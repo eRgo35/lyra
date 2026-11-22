@@ -1,6 +1,9 @@
 use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::commands::music::repeat_all::Enqueuer;
-use crate::{commands::embeds::error_embed, Context, Error};
+use crate::{
+    commands::embeds::{error_embed, with_detail},
+    Context, Error,
+};
 
 use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
@@ -135,8 +138,8 @@ async fn handle_play<'a>(
             Ok(metadata) => metadata,
             Err(e) => {
                 warn!("Failed to load track metadata: {e}");
-                let msg = "Could not load that track!";
-                ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                let msg = with_detail("Could not load that track!", &e);
+                ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
                     .await?;
                 return Ok(results);
             }

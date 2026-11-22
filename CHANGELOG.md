@@ -6,10 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `DETAILED_ERRORS=true` adds the underlying error (such as yt-dlp's message) to
+  error replies.
+
 ### Fixed
 
 - `/play` and `/forceplay` failing with "Unknown interaction" when yt-dlp takes
   more than 3 seconds to resolve the track.
+- A command that fails unexpectedly now replies with an error instead of
+  leaving "The application did not respond".
 
 ## [0.17.1] - 2026-11-22
 

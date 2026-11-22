@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use tracing::warn;
 
 use crate::{
-    commands::embeds::{embed, error_embed},
+    commands::embeds::{embed, error_embed, with_detail},
     Context, Error,
 };
 
@@ -36,14 +36,14 @@ pub async fn get_json<T: DeserializeOwned>(
         .await
         .map_err(|e| {
             warn!("Request to {service} failed: {e}");
-            format!("Could not reach {service}!")
+            with_detail(&format!("Could not reach {service}!"), &e)
         })?;
 
     match response.status() {
         reqwest::StatusCode::NOT_FOUND | reqwest::StatusCode::NO_CONTENT => Ok(None),
         status if status.is_success() => response.json::<T>().await.map(Some).map_err(|e| {
             warn!("Could not parse the response from {service}: {e}");
-            format!("Could not read the response from {service}!")
+            with_detail(&format!("Could not read the response from {service}!"), &e)
         }),
         status => {
             warn!("{service} returned {status}");

@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::{
-    commands::embeds::{embed, error_embed},
+    commands::embeds::{embed, error_embed, with_detail},
     Context, Error,
 };
 use poise::CreateReply;
@@ -67,7 +67,7 @@ pub async fn seek(
         }
         Err(e) => {
             warn!("Seek to {destination:?} failed: {e}");
-            reply_error(ctx, "This track cannot be seeked!").await?;
+            reply_error(ctx, &with_detail("This track cannot be seeked!", &e)).await?;
         }
     }
 

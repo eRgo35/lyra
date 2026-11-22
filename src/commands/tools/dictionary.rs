@@ -4,7 +4,7 @@ use tracing::warn;
 use url::form_urlencoded;
 
 use crate::{
-    commands::embeds::{embed, error_embed},
+    commands::embeds::{embed, error_embed, with_detail},
     Context, Error,
 };
 
@@ -51,14 +51,14 @@ pub async fn define(
         .await
         .map_err(|e| {
             warn!("Dictionary request failed: {e}");
-            "Could not reach the dictionary!".to_string()
+            with_detail("Could not reach the dictionary!", &e)
         })?;
 
     match response.status() {
         reqwest::StatusCode::OK => {
             let parsed = response.json::<Vec<Word>>().await.map_err(|e| {
                 warn!("Could not parse dictionary response: {e}");
-                "Could not read the dictionary response!".to_string()
+                with_detail("Could not read the dictionary response!", &e)
             })?;
             parsed.first().map(format_entry).ok_or_else(not_found)
         }
