@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `urban <term>` (Urban Dictionary, shown behind spoilers), `userinfo [user]`
+  and `serverinfo`.
 - Minecraft: `mcstatus <server>` (online, MOTD, players, version via
   mcsrvstat.us) and `mcplayer <name>` (UUID, head and skin render).
 
