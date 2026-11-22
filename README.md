@@ -144,6 +144,8 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `help [command]` | `huh`, `welp` | List commands, or show details for one. |
 | `ping` | | Reply with the response time. |
 | `uptime` | | How long the bot has been running. |
+| `userinfo [user]` | `whoami`, `user` | Account age, ID and avatar; in a server also nickname, join date, boosting and roles. |
+| `serverinfo` | `guildinfo`, `server` | Owner, creation date, members, channels, roles, emojis and boosts. |
 | `posix` | | Current time as milliseconds since the Unix epoch. |
 | `qr <text>` | | Generate a QR code image for the text. |
 | `dictionary <word>` | `dict` | English dictionary lookup. |
@@ -172,6 +174,7 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `coinflip` | `flip` | Heads or tails. |
 | `choose <a \| b \| c>` | `pick` | Pick one option; separate them with `\|` or commas. |
 | `rps <rock\|paper\|scissors>` | | Rock, paper, scissors against the bot. |
+| `urban <term>` | `ud` | Top Urban Dictionary definition and example, behind spoilers since they are often crude. |
 | `mock <text>` | | aLtErNaTe ThE cAsE of your text. |
 
 A hidden, owner-only prefix command `register` re-registers slash commands with buttons; you do not

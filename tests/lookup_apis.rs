@@ -363,3 +363,42 @@ async fn mcplayer_found_and_missing() {
         Err("There is no Minecraft player called nobody_here!".to_string())
     );
 }
+
+#[tokio::test]
+async fn urban_shows_the_top_definition_spoilered() {
+    use lyra::commands::fun::urban::fetch_urban;
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v0/define"))
+        .and(query_param("term", "yeet"))
+        .respond_with(json(
+            200,
+            r#"{"list": [{"word": "Yeet", "definition": "To [discard] an [item]",
+                          "example": "He yeeted the [can]", "thumbs_up": 5, "thumbs_down": 1,
+                          "permalink": "https://ud/yeet"},
+                         {"word": "yeet", "definition": "second"}]}"#,
+        ))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v0/define"))
+        .and(query_param("term", "zzqq"))
+        .respond_with(json(200, r#"{"list": []}"#))
+        .mount(&server)
+        .await;
+    let client = reqwest::Client::new();
+
+    assert_eq!(
+        fetch_urban(&client, &server.uri(), " yeet ").await,
+        Ok((
+            "Yeet".to_string(),
+            "||To discard an item||\n\n**Example**\n||He yeeted the can||\n\n\
+             👍 5 · 👎 1 · [Open](https://ud/yeet)"
+                .to_string()
+        ))
+    );
+    assert_eq!(
+        fetch_urban(&client, &server.uri(), "zzqq").await,
+        Err("Urban Dictionary has nothing for \"zzqq\"!".to_string())
+    );
+}

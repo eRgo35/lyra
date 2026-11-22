@@ -143,3 +143,14 @@ async fn minecraft_server_and_player() {
     let render = client.get(card.image.unwrap()).send().await.unwrap();
     assert!(render.status().is_success());
 }
+
+#[tokio::test]
+#[ignore = "network: api.urbandictionary.com"]
+async fn urban_for_a_real_word() {
+    use lyra::commands::fun::urban::{fetch_urban, URBAN_API};
+    let (word, description) = fetch_urban(&reqwest::Client::new(), URBAN_API, "yeet")
+        .await
+        .unwrap();
+    assert_eq!(word.to_lowercase(), "yeet");
+    assert!(description.starts_with("||"), "{description}");
+}
