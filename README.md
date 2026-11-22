@@ -134,7 +134,6 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `help [command]` | `huh`, `welp` | List commands, or show details for one. |
 | `ping` | | Reply with the response time. |
 | `uptime` | | How long the bot has been running. |
-| `dice` | | Roll a six-sided die. |
 | `posix` | | Current time as milliseconds since the Unix epoch. |
 | `qr <text>` | | Generate a QR code image for the text. |
 | `dictionary <word>` | `dict` | English dictionary lookup. |
@@ -146,6 +145,17 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `taf <ICAO>` | | Airport forecast, one line per change group. |
 | `whois <domain>` | | Domain registrar, dates, status and name servers (RDAP). |
 | `ip <address or hostname>` | | Network, owner, country and abuse contact for a public IP (RDAP). Private addresses are refused. |
+
+### Fun
+
+| Command | Aliases | Description |
+| --- | --- | --- |
+| `dice [notation]` | `roll` | Roll a six-sided die, or dice notation such as `d20`, `2d6` or `3d8+2` (up to 100 dice, 1000 sides). |
+| `8ball <question>` | `eightball` | Ask the magic 8-ball. |
+| `coinflip` | `flip` | Heads or tails. |
+| `choose <a \| b \| c>` | `pick` | Pick one option; separate them with `\|` or commas. |
+| `rps <rock\|paper\|scissors>` | | Rock, paper, scissors against the bot. |
+| `mock <text>` | | aLtErNaTe ThE cAsE of your text. |
 
 A hidden, owner-only prefix command `register` re-registers slash commands with buttons; you do not
 need it for normal setup because slash commands are registered at startup.

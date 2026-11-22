@@ -11,6 +11,7 @@ use tracing::{error, info, warn};
 pub mod commands;
 pub mod http;
 
+use crate::commands::fun;
 use crate::commands::music;
 use crate::commands::tools;
 use crate::http::HttpKey;
@@ -57,6 +58,11 @@ pub fn commands() -> Vec<poise::Command<Data, Error>> {
         music::volume(),
         music::soundboard::effect(),
         music::soundboard::stream(),
+        fun::choose(),
+        fun::coinflip(),
+        fun::eightball(),
+        fun::mock(),
+        fun::rps(),
         tools::ai(),
         tools::dice(),
         tools::dictionary(),

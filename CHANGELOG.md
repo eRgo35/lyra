@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Fun commands: `8ball`, `coinflip`, `choose a | b | c`, `rps` and `mock`.
+  `dice` (now also `roll`) takes dice notation like `2d20+3`. These are listed
+  under a new "Fun" category in `help` (#12).
 - Working `weather`, `metar` and `taf` commands (they used to reply "Work in
   progress"), plus new `whois <domain>` and `ip <address or hostname>`. All use
   free services that need no API key: Open-Meteo, aviationweather.gov and RDAP
