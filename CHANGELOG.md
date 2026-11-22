@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-22
+
 ### Added
 
 - CI runs `cargo deny check advisories`. Accepted advisories are listed in
@@ -61,9 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path, i.e. those three items under "Security (known, unresolved)" in 0.11.2.
   No Lyra source change; a real `wss://gateway.discord.gg` handshake was
   verified. Remove the patch when serenity 0.13 is released.
-- Still unresolved: RUSTSEC-2026-0381 (`webpki-roots 0.26.11`, needs 1.x), the
-  lock-only `libcrux` advisories, `ringbuf` 0.4.8 (RUSTSEC-2026-0293) and the
-  unmaintained-crate warnings.
+- RUSTSEC-2026-0381 (`webpki-roots`) is resolved: 0.26.11 is a shim over
+  1.0.10, which has the fix, and the advisory now lists it as unaffected.
+- Still unresolved: the lock-only `libcrux` advisories, `ringbuf` 0.4.8
+  (RUSTSEC-2026-0293), `crypto-bigint` 0.5.5 (RUSTSEC-2026-0387) and the
+  unmaintained-crate warnings; all are accepted in `deny.toml` with reasons.
 
 ## [0.11.2] - 2026-10-20
 
@@ -251,3 +255,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.11.0]: https://github.com/eRgo35/lyra/compare/v0.10.8...v0.11.0
 [0.11.1]: https://github.com/eRgo35/lyra/compare/v0.11.0...v0.11.1
+[0.12.0]: https://github.com/eRgo35/lyra/compare/v0.11.2...v0.12.0
