@@ -1,6 +1,8 @@
 // poise's #[rest] codegen trips unreachable_code on Rust 1.100+
 #[allow(unreachable_code)]
 pub mod ai;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
 pub mod dice;
 // poise's #[rest] codegen trips unreachable_code on Rust 1.100+
 #[allow(unreachable_code)]

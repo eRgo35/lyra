@@ -156,3 +156,13 @@ fn queue_control_commands_are_registered() {
         );
     }
 }
+
+#[test]
+fn help_listing_fits_in_one_embed() {
+    use lyra::commands::tools::help::{command_list, EXTRA_TEXT_AT_BOTTOM};
+    let text = command_list(&lyra::commands(), "!") + EXTRA_TEXT_AT_BOTTOM;
+    let length = text.chars().count();
+    // Discord rejects embed descriptions over 4096 characters.
+    assert!(length <= 4096, "help is {length} characters");
+    eprintln!("help listing: {length} characters");
+}

@@ -1,4 +1,4 @@
-use crate::{commands::embeds::embed, Context, Error};
+use crate::{commands::embeds::embed, Context, Data, Error};
 use poise::CreateReply;
 use std::fmt::Write as _;
 
@@ -14,10 +14,6 @@ pub async fn help(
     ctx: Context<'_>,
     #[description = "Specific command to show help about"] command: Option<String>,
 ) -> Result<(), Error> {
-    let extra_text_at_bottom = "\
-Use /help command for more info on a command.
-You can edit you message to the bot and the bot will edit its response.";
-
     let commands = &ctx.framework().options().commands;
 
     let mut found = command
@@ -123,7 +119,6 @@ You can edit you message to the bot and the bot will edit its response.";
     } else if let Some(name) = command {
         format!("No such command `{}`", name)
     } else {
-        // List all top-level commands grouped by category
         let prefix_str = ctx
             .framework()
             .options()
@@ -132,41 +127,50 @@ You can edit you message to the bot and the bot will edit its response.";
             .as_ref()
             .map(|p| p.to_string())
             .unwrap_or_default();
-
-        let mut by_category: std::collections::BTreeMap<String, Vec<String>> =
-            std::collections::BTreeMap::new();
-        for cmd in commands.iter() {
-            let invocation = if cmd.slash_action.is_some() {
-                format!("`/{}`", cmd.name)
-            } else if cmd.prefix_action.is_some() {
-                format!("`{}{}`", prefix_str, cmd.name)
-            } else {
-                continue;
-            };
-            let description = cmd.description.as_deref().unwrap_or("").to_string();
-            let category = match &cmd.category {
-                Some(cat) => cat.to_string(),
-                None => "Uncategorized".to_string(),
-            };
-            by_category
-                .entry(category)
-                .or_default()
-                .push(format!("{}  - {}", invocation, description));
-        }
-
-        let mut text = String::new();
-        for (category, cmds) in &by_category {
-            writeln!(text, "{}:", category).unwrap();
-            for line in cmds {
-                writeln!(text, "{}", line).unwrap();
-            }
-            text.push('\n');
-        }
-        text.push_str(extra_text_at_bottom);
+        let mut text = command_list(commands, &prefix_str);
+        text.push_str(EXTRA_TEXT_AT_BOTTOM);
         text
     };
 
     ctx.send(CreateReply::default().embed(embed(ctx, "Lyra", &reply, "").await.unwrap()))
         .await?;
     Ok(())
+}
+
+pub const EXTRA_TEXT_AT_BOTTOM: &str = "\
+Use /help command for more info on a command.
+You can edit you message to the bot and the bot will edit its response.";
+
+/// All top-level commands grouped by category, one line each, as `help` lists them.
+pub fn command_list(commands: &[poise::Command<Data, Error>], prefix: &str) -> String {
+    let mut by_category: std::collections::BTreeMap<String, Vec<String>> =
+        std::collections::BTreeMap::new();
+    for cmd in commands.iter() {
+        let invocation = if cmd.slash_action.is_some() {
+            format!("`/{}`", cmd.name)
+        } else if cmd.prefix_action.is_some() {
+            format!("`{}{}`", prefix, cmd.name)
+        } else {
+            continue;
+        };
+        let description = cmd.description.as_deref().unwrap_or("").to_string();
+        let category = match &cmd.category {
+            Some(cat) => cat.to_string(),
+            None => "Uncategorized".to_string(),
+        };
+        by_category
+            .entry(category)
+            .or_default()
+            .push(format!("{}  - {}", invocation, description));
+    }
+
+    let mut text = String::new();
+    for (category, cmds) in &by_category {
+        writeln!(text, "{}:", category).unwrap();
+        for line in cmds {
+            writeln!(text, "{}", line).unwrap();
+        }
+        text.push('\n');
+    }
+    text
 }
