@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-22
+
 ### Added
 
 - `repeat` modes: `repeat one` loops the current track, `repeat all` loops
@@ -18,18 +20,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `forceplay` (`fp`, `playnow`) plays a track immediately; the interrupted
   track is queued right after it and restarts from the beginning. Only the
   first track of a playlist is used (#5).
-- CI runs `cargo deny check advisories`. Accepted advisories are listed in
-  `deny.toml` with their reasons; any new RustSec advisory fails the build.
 
 ### Fixed
 
-- The track error logger was registered again on every `play` and soundboard
-  command; it is now registered once when the bot joins.
 - Enqueueing playlists is much faster. YouTube playlist tracks reuse the
   title, duration, channel and thumbnail from the single `--flat-playlist`
   call instead of one `yt-dlp` run per track (a 200-track playlist went from
   over 5 minutes to about 2 seconds); Spotify and search entries are looked
   up 4 at a time, still enqueued in order (#6).
+- The track error logger was registered again on every `play` and soundboard
+  command; it is now registered once when the bot joins.
+
+## [0.12.0] - 2026-11-22
+
+### Added
+
+- CI runs `cargo deny check advisories`. Accepted advisories are listed in
+  `deny.toml` with their reasons; any new RustSec advisory fails the build.
+
+### Fixed
+
 - `seek` now does what it says: `90` or `1:30` jumps to that position and
   `+30` / `-15` moves relative to the current one (clamped at the start).
   It reports the new position, or an error when the target is past the end
@@ -78,9 +88,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path, i.e. those three items under "Security (known, unresolved)" in 0.11.2.
   No Lyra source change; a real `wss://gateway.discord.gg` handshake was
   verified. Remove the patch when serenity 0.13 is released.
-- Still unresolved: RUSTSEC-2026-0381 (`webpki-roots 0.26.11`, needs 1.x), the
-  lock-only `libcrux` advisories, `ringbuf` 0.4.8 (RUSTSEC-2026-0293) and the
-  unmaintained-crate warnings.
+- RUSTSEC-2026-0381 (`webpki-roots`) is resolved: 0.26.11 is a shim over
+  1.0.10, which has the fix, and the advisory now lists it as unaffected.
+- Still unresolved: the lock-only `libcrux` advisories, `ringbuf` 0.4.8
+  (RUSTSEC-2026-0293), `crypto-bigint` 0.5.5 (RUSTSEC-2026-0387) and the
+  unmaintained-crate warnings; all are accepted in `deny.toml` with reasons.
 
 ## [0.11.2] - 2026-10-20
 
@@ -268,3 +280,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.11.0]: https://github.com/eRgo35/lyra/compare/v0.10.8...v0.11.0
 [0.11.1]: https://github.com/eRgo35/lyra/compare/v0.11.0...v0.11.1
+[0.12.0]: https://github.com/eRgo35/lyra/compare/v0.11.2...v0.12.0
+[0.13.0]: https://github.com/eRgo35/lyra/compare/v0.12.0...v0.13.0
