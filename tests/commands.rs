@@ -149,6 +149,12 @@ fn queue_control_commands_are_registered() {
         "seek",
         "skip",
         "queue",
+        "nowplaying",
+        "shuffle",
+        "remove",
+        "move",
+        "clear",
+        "lyrics",
     ] {
         assert!(
             names.iter().any(|n| n == expected),

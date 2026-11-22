@@ -119,6 +119,12 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `jump <position>` | `j` | Skip to a queue position as numbered by `queue` (1 = next track); the tracks before it are dropped. |
 | `stop` | `end` | Stop playback and clear the queue (the bot stays in the channel). |
 | `queue` | `q` | Show the next tracks in the queue. |
+| `nowplaying` | `np` | The current track with a progress bar, link and thumbnail. |
+| `lyrics [song]` | | Lyrics for the current track, or for the song you name ([lrclib.net](https://lrclib.net)). |
+| `shuffle` | | Shuffle the upcoming tracks (the current one keeps playing). |
+| `remove <position>` | `rm` | Remove one upcoming track (positions as numbered by `queue`). |
+| `move <from> <to>` | `mv` | Move an upcoming track to another position. |
+| `clear` | | Remove all upcoming tracks; the current one keeps playing. |
 | `repeat <off\|one\|all\|n>` | `loop`, `while`, `for` | `one` loops the current track forever, `n` loops it n more times, `all` loops the whole queue (finished and skipped tracks go back to the end), `off` turns repeating off. Shown in `queue`. |
 | `seek <position>` | | Jump to a position (`90`, `1:30`) or move by an offset (`+30`, `-15`) in the current track. |
 | `volume <percent>` | | Set the volume of the current track. |
