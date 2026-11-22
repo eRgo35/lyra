@@ -18,6 +18,14 @@ Releases are cut by hand and built by [cargo-dist](https://opensource.axo.dev/ca
 4. The `Release` workflow (`.github/workflows/release.yml`) builds
    `x86_64-unknown-linux-gnu`, the shell installer and checksums, and creates
    the GitHub Release.
+5. The same tag triggers `Docker image` (`.github/workflows/docker.yml`), which
+   pushes `ghcr.io/ergo35/lyra:X.Y.Z`, `:X.Y` and `:latest`. The first time,
+   make the package public under the repository's *Packages* settings so
+   `docker compose pull` works without logging in.
+
+   To refresh the pinned `yt-dlp`/`deno` in the image, bump their version and
+   SHA-256 `ARG`s in `Dockerfile` (checksums from each release's
+   `SHA2-256SUMS` / `.sha256sum` files). `yt-dlp` also updates itself on start.
 
 ## Changing release config
 

@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Docker image (`ghcr.io/ergo35/lyra`, published on every release) with
+  `yt-dlp` (self-updating on start), `deno` and `ffmpeg`, plus `compose.yaml`:
+  `cp .env.example .env && docker compose up -d`. Restarts on crashes and
+  reboots.
+- systemd service (`deploy/systemd/lyra.service`, sandboxed, restarts on
+  failure) and `deploy/systemd/install.sh`, which installs the release binary,
+  a `lyra` user and `/etc/lyra/lyra.env`.
 - `repeat` modes: `repeat one` loops the current track, `repeat all` loops
   the whole queue (finished and skipped tracks are enqueued again at the
   end), `repeat <n>` loops the current track n times and `repeat off` turns

@@ -84,6 +84,8 @@ itself may want `ffmpeg` for some sites; that is outside what has been verified 
 6. **Run it** from that directory: `lyra` (or `./target/release/lyra` after a source build).
    Join a voice channel and try `!play never gonna give you up` or `/play`.
 
+To keep it running on a server (Docker or systemd), see [Running on a server](#running-on-a-server).
+
 ## Configuration
 
 Lyra reads its settings from the environment. A `.env` file in the working directory
@@ -162,32 +164,52 @@ You need a Rust toolchain, a C compiler, `cmake` and `pkg-config`
 With Nix, `nix develop` opens a shell with the Rust toolchain, OpenSSL, `pkg-config`, `cmake`, opus and
 `cross`. The flake provides a dev shell only, not an installable package.
 
-## Self-hosting tips
+## Running on a server
 
-[`scripts/launch.sh`](scripts/launch.sh) starts `./lyra` detached with `nohup`, writing `lyra.log` and
-`lyra.err` in the current directory.
+Two ways to keep Lyra running, restarted on crashes and on boot. Both start from steps 1–2 of the
+[Quick start](#quick-start) (create and invite the bot).
 
-A minimal systemd unit, assuming the binary and `.env` live in `/opt/lyra`
-(`yt-dlp` must be on the service's `PATH`):
+### Docker (recommended)
 
-```ini
-[Unit]
-Description=Lyra Discord bot
-After=network-online.target
-Wants=network-online.target
+The image includes everything Lyra needs: `yt-dlp` (updated automatically on every start, since
+YouTube changes often), `deno` (the JavaScript runtime `yt-dlp` uses for YouTube) and `ffmpeg`.
+It is published to `ghcr.io/ergo35/lyra` for every release (`x86_64`).
 
-[Service]
-WorkingDirectory=/opt/lyra
-ExecStart=/opt/lyra/lyra
-Environment=RUST_LOG=info
-Restart=on-failure
-User=lyra
-
-[Install]
-WantedBy=multi-user.target
+```bash
+git clone https://github.com/eRgo35/lyra && cd lyra   # or just download compose.yaml and .env.example
+cp .env.example .env                                 # fill in DISCORD_TOKEN and PREFIX
+docker compose up -d
+docker compose logs -f                               # watch it connect
 ```
 
-Keep `.env` out of version control (it is already in `.gitignore`) and readable only by the service user.
+- **Update:** `docker compose pull && docker compose up -d`
+- **Build from your checkout instead** (e.g. on `arm64`, or to run unreleased changes):
+  `docker compose up -d --build`
+- `restart: unless-stopped` brings it back after crashes and reboots (enable the Docker service
+  itself with `systemctl enable docker`). Logs are rotated at 3 × 10 MB.
+
+### systemd
+
+For running the release binary directly on a Linux host (`x86_64`):
+
+```bash
+git clone https://github.com/eRgo35/lyra && cd lyra
+sudo deploy/systemd/install.sh            # or: sudo deploy/systemd/install.sh ./target/release/lyra
+sudoedit /etc/lyra/lyra.env               # fill in DISCORD_TOKEN and PREFIX
+sudo systemctl enable --now lyra
+journalctl -u lyra -f
+```
+
+The script installs the binary to `/usr/local/bin/lyra`, creates a `lyra` system user, writes
+`/etc/lyra/lyra.env` (mode `0600`, only if missing) and installs
+[`deploy/systemd/lyra.service`](deploy/systemd/lyra.service), which restarts on failure and runs
+sandboxed. Re-run it to update. You install `yt-dlp` yourself; the script warns if it is missing
+and prints the command for the self-updating standalone binary.
+
+[`scripts/launch.sh`](scripts/launch.sh) (`nohup ./lyra &`) is fine for a quick test, but it does
+not restart Lyra.
+
+Keep `.env` / `lyra.env` out of version control (`.env` is already in `.gitignore`).
 
 ## Contributing, security, license
 
