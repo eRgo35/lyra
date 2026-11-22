@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-22
+
 ### Added
 
 - Docker image (`ghcr.io/ergo35/lyra`, published on every release) with
@@ -15,6 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - systemd service (`deploy/systemd/lyra.service`, sandboxed, restarts on
   failure) and `deploy/systemd/install.sh`, which installs the release binary,
   a `lyra` user and `/etc/lyra/lyra.env`.
+
+### Fixed
+
+- `uptime` uses singular units ("1 minute") and says "0 seconds" right
+  after start.
+
+### Changed
+
+- The bot is split into a library and a thin binary so `tests/` can use it,
+  with unit, integration (wiremock) and opt-in end-to-end tests. No
+  behaviour change.
+
+## [0.13.0] - 2026-11-22
+
+### Added
+
 - `repeat` modes: `repeat one` loops the current track, `repeat all` loops
   the whole queue (finished and skipped tracks are enqueued again at the
   end), `repeat <n>` loops the current track n times and `repeat off` turns
@@ -25,20 +43,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `forceplay` (`fp`, `playnow`) plays a track immediately; the interrupted
   track is queued right after it and restarts from the beginning. Only the
   first track of a playlist is used (#5).
-- CI runs `cargo deny check advisories`. Accepted advisories are listed in
-  `deny.toml` with their reasons; any new RustSec advisory fails the build.
 
 ### Fixed
 
-- `uptime` uses singular units ("1 minute") and says "0 seconds" right
-  after start.
-- The track error logger was registered again on every `play` and soundboard
-  command; it is now registered once when the bot joins.
 - Enqueueing playlists is much faster. YouTube playlist tracks reuse the
   title, duration, channel and thumbnail from the single `--flat-playlist`
   call instead of one `yt-dlp` run per track (a 200-track playlist went from
   over 5 minutes to about 2 seconds); Spotify and search entries are looked
   up 4 at a time, still enqueued in order (#6).
+- The track error logger was registered again on every `play` and soundboard
+  command; it is now registered once when the bot joins.
+
+## [0.12.0] - 2026-11-22
+
+### Added
+
+- CI runs `cargo deny check advisories`. Accepted advisories are listed in
+  `deny.toml` with their reasons; any new RustSec advisory fails the build.
+
+### Fixed
+
 - `seek` now does what it says: `90` or `1:30` jumps to that position and
   `+30` / `-15` moves relative to the current one (clamped at the start).
   It reports the new position, or an error when the target is past the end
@@ -279,3 +303,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.11.0]: https://github.com/eRgo35/lyra/compare/v0.10.8...v0.11.0
 [0.11.1]: https://github.com/eRgo35/lyra/compare/v0.11.0...v0.11.1
+[0.12.0]: https://github.com/eRgo35/lyra/compare/v0.11.2...v0.12.0
+[0.13.0]: https://github.com/eRgo35/lyra/compare/v0.12.0...v0.13.0
+[0.14.0]: https://github.com/eRgo35/lyra/compare/v0.13.0...v0.14.0
