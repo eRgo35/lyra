@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- No sound from many YouTube tracks (403 Forbidden): YouTube now refuses some
+  streams for a few seconds after handing out their URL, so Lyra waits until
+  they are available, as yt-dlp does.
+
 ### Added
 
 - `MEDIA_PROXY`: an HTTP proxy for music (yt-dlp and the audio stream), for
