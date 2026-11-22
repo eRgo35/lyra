@@ -130,6 +130,10 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `volume <percent>` | | Set the volume of the current track. |
 | `mute` | `shhh`, `unmute` | Toggle the bot's self-mute. |
 | `deafen` | `shuush`, `undeafen` | Toggle the bot's self-deafen. |
+| `soundboard show` | `sb` | Your server's custom sounds as buttons (20 per page); click one to play it on top of the queue. The bot joins your voice channel if it isn't in one. Buttons work for 10 minutes. |
+| `soundboard add <name> <url or search>` | | Add a sound (name: up to 32 of `a-z`, `0-9`, `-`, `_`). The source is resolved once, so the button always plays the same thing. Up to 100 sounds per server. |
+| `soundboard remove <name>` | | Remove a sound you added (anyone with *Manage Server* can remove any). |
+| `soundboard play <name>` | | Play a sound by name. |
 | `effect [pause] <query or url>` | | Play an audio effect (a search or URL) immediately, outside the queue. Add the word `pause` to pause the queue first. |
 | `stream [pause] <query or url>` | `override`, `hijack` | Hijack the output: play a track immediately, outside the queue (same `pause` option). |
 
@@ -205,6 +209,7 @@ docker compose logs -f                               # watch it connect
 - **Update:** `docker compose pull && docker compose up -d`
 - **Build from your checkout instead** (e.g. on `arm64`, or to run unreleased changes):
   `docker compose up -d --build`
+- Soundboard sounds are kept in the `lyra-data` volume, so they survive updates.
 - `restart: unless-stopped` brings it back after crashes and reboots (enable the Docker service
   itself with `systemctl enable docker`). Logs are rotated at 3 × 10 MB.
 
@@ -223,7 +228,7 @@ journalctl -u lyra -f
 The script installs the binary to `/usr/local/bin/lyra`, creates a `lyra` system user, writes
 `/etc/lyra/lyra.env` (mode `0600`, only if missing) and installs
 [`deploy/systemd/lyra.service`](deploy/systemd/lyra.service), which restarts on failure and runs
-sandboxed. Re-run it to update. You install `yt-dlp` yourself; the script warns if it is missing
+sandboxed. Soundboard sounds are stored in `/var/lib/lyra/data`. Re-run it to update. You install `yt-dlp` yourself; the script warns if it is missing
 and prints the command for the self-updating standalone binary.
 
 [`scripts/launch.sh`](scripts/launch.sh) (`nohup ./lyra &`) is fine for a quick test, but it does
