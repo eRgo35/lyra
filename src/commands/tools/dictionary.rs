@@ -16,54 +16,58 @@ pub async fn dictionary(
     #[rest]
     word: String,
 ) -> Result<(), Error> {
-    let data: String = form_urlencoded::byte_serialize(word.as_bytes()).collect();
-
-    let response = ctx
-        .data()
-        .http_client
-        .get(format!(
-            "https://api.dictionaryapi.dev/api/v2/entries/en/{}",
-            data
-        ))
-        .send()
-        .await;
-
-    let error = match response {
-        Err(e) => {
-            warn!("Dictionary request failed: {e}");
-            "Could not reach the dictionary!".to_string()
+    match define(&ctx.data().http_client, DICTIONARY_API, &word).await {
+        Ok((title, description)) => {
+            ctx.send(
+                CreateReply::default().embed(embed(ctx, "Dictionary", &description, &title).await?),
+            )
+            .await?;
         }
-        Ok(response) => match response.status() {
-            reqwest::StatusCode::OK => match response.json::<Vec<Word>>().await {
-                Ok(parsed) => match parsed.first() {
-                    Some(entry) => {
-                        let (title, description) = format_entry(entry);
-                        ctx.send(
-                            CreateReply::default()
-                                .embed(embed(ctx, "Dictionary", &description, &title).await?),
-                        )
-                        .await?;
-                        return Ok(());
-                    }
-                    None => format!("No definitions found for \"{}\"!", word),
-                },
-                Err(e) => {
-                    warn!("Could not parse dictionary response: {e}");
-                    "Could not read the dictionary response!".to_string()
-                }
-            },
-            reqwest::StatusCode::NOT_FOUND => format!("No definitions found for \"{}\"!", word),
-            status => {
-                warn!("Dictionary API returned {status}");
-                format!("The dictionary returned an error ({status})!")
-            }
-        },
-    };
-
-    ctx.send(CreateReply::default().embed(error_embed(ctx, &error).await?))
-        .await?;
+        Err(msg) => {
+            ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
+                .await?;
+        }
+    }
 
     Ok(())
+}
+
+pub const DICTIONARY_API: &str = "https://api.dictionaryapi.dev/api/v2/entries/en";
+
+/// Looks `word` up at `base_url` (the dictionaryapi.dev entries endpoint).
+///
+/// Returns the embed title and description, or the message to show the user.
+pub async fn define(
+    client: &reqwest::Client,
+    base_url: &str,
+    word: &str,
+) -> Result<(String, String), String> {
+    let data: String = form_urlencoded::byte_serialize(word.as_bytes()).collect();
+    let not_found = || format!("No definitions found for \"{}\"!", word);
+
+    let response = client
+        .get(format!("{}/{}", base_url, data))
+        .send()
+        .await
+        .map_err(|e| {
+            warn!("Dictionary request failed: {e}");
+            "Could not reach the dictionary!".to_string()
+        })?;
+
+    match response.status() {
+        reqwest::StatusCode::OK => {
+            let parsed = response.json::<Vec<Word>>().await.map_err(|e| {
+                warn!("Could not parse dictionary response: {e}");
+                "Could not read the dictionary response!".to_string()
+            })?;
+            parsed.first().map(format_entry).ok_or_else(not_found)
+        }
+        reqwest::StatusCode::NOT_FOUND => Err(not_found()),
+        status => {
+            warn!("Dictionary API returned {status}");
+            Err(format!("The dictionary returned an error ({status})!"))
+        }
+    }
 }
 
 /// Embed title (word and phonetic) and description (first definition per part of speech).
