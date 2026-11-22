@@ -11,7 +11,7 @@ use poise::serenity_prelude::{
 use poise::CreateReply;
 use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
-use songbird::input::{Compose, YoutubeDl};
+use songbird::input::Compose;
 use songbird::tracks::TrackQueue;
 use songbird::Call;
 use spotify_parser;
@@ -53,7 +53,7 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
     let enqueuer = Enqueuer {
         manager: manager.clone(),
         guild_id,
-        http_client: ctx.data().http_client.clone(),
+        http_client: ctx.data().media_client.clone(),
         repeat: ctx.data().repeat_all.clone(),
     };
 
@@ -235,6 +235,7 @@ pub async fn parse_data(data: String) -> std::io::Result<VecDeque<Entry>> {
     {
         if track.contains("?list=") {
             let output = Command::new("yt-dlp")
+                .args(crate::http::ytdl_proxy_args())
                 .args(["-j", "--flat-playlist", "--", &track])
                 .output()
                 .await?;
@@ -302,7 +303,7 @@ async fn lookup_metadata(
     enqueuer: &Enqueuer,
     query: String,
 ) -> Result<AuxMetadata, songbird::input::AudioStreamError> {
-    YoutubeDl::new_ytdl_like("yt-dlp", enqueuer.http_client.clone(), query)
+    crate::http::ytdl(enqueuer.http_client.clone(), query)
         .aux_metadata()
         .await
 }

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `MEDIA_PROXY`: an HTTP proxy for music (yt-dlp and the audio stream), for
+  servers whose IP YouTube blocks.
+
 ## [0.18.0] - 2026-11-22
 
 ### Added

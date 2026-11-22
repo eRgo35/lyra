@@ -7,7 +7,7 @@ use reqwest::Client;
 use serenity::all::GuildId;
 use serenity::async_trait;
 use songbird::events::{Event, EventContext, EventHandler, TrackEvent};
-use songbird::input::{AuxMetadata, YoutubeDl};
+use songbird::input::AuxMetadata;
 use songbird::tracks::{Track, TrackHandle};
 use songbird::{Call, Songbird};
 
@@ -71,7 +71,7 @@ impl Enqueuer {
         query: String,
         metadata: AuxMetadata,
     ) -> TrackHandle {
-        let src = YoutubeDl::new_ytdl_like("yt-dlp", self.http_client.clone(), query);
+        let src = crate::http::ytdl(self.http_client.clone(), query);
         let handle = call
             .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())))
             .await;

@@ -8,7 +8,7 @@ use poise::serenity_prelude::{
     EditInteractionResponse, GuildId, UserId,
 };
 use poise::CreateReply;
-use songbird::input::{Compose, YoutubeDl};
+use songbird::input::Compose;
 use songbird::TrackEvent;
 
 use super::store::{sound_name, Sound};
@@ -67,7 +67,7 @@ pub async fn add(
     } else {
         format!("ytsearch:{source}")
     };
-    let metadata = YoutubeDl::new_ytdl_like("yt-dlp", ctx.data().http_client.clone(), query)
+    let metadata = crate::http::ytdl(ctx.data().media_client.clone(), query)
         .aux_metadata()
         .await;
     let Some((url, title)) = metadata.ok().and_then(|m| {
@@ -291,11 +291,7 @@ async fn play(ctx: Context<'_>, sound: &Sound, user: UserId) -> Result<(), Strin
         }
     };
 
-    let src = YoutubeDl::new_ytdl_like(
-        "yt-dlp",
-        ctx.data().http_client.clone(),
-        sound.source.clone(),
-    );
+    let src = crate::http::ytdl(ctx.data().media_client.clone(), sound.source.clone());
     let _ = call.lock().await.play_input(src.into());
     Ok(())
 }
