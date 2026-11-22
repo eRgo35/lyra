@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Soundboard (#7): `soundboard add <name> <url or search>`, `remove`, `play`,
+  and `show`, which posts the server's sounds as buttons that play on top of
+  the queue. Sounds are stored per server in `data/soundboard/<guild>.json`
+  under the working directory: a `lyra-data` volume in `compose.yaml`, or
+  `/var/lib/lyra/data` under systemd.
 - Music: `nowplaying` (`np`) with a progress bar, `lyrics [song]` (lrclib.net;
   the current track by default), `shuffle`, `remove <n>` (`rm`), `move <from>
   <to>` (`mv`) and `clear`. Tracks removed with `remove` or `clear` stay

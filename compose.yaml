@@ -8,8 +8,14 @@ services:
     env_file: .env
     restart: unless-stopped
     stop_signal: SIGINT
+    volumes:
+      # Custom soundboard sounds.
+      - lyra-data:/home/lyra/data
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  lyra-data:

@@ -19,9 +19,14 @@ use crate::http::HttpKey;
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Context<'a> = poise::Context<'a, Data, Error>;
 
+/// Where custom soundboard sounds are kept, relative to the working directory
+/// (a volume in Docker, `/var/lib/lyra` under systemd).
+pub const SOUNDBOARD_DIR: &str = "data/soundboard";
+
 pub struct Data {
     pub http_client: HttpClient,
     pub repeat_all: std::sync::Arc<music::repeat_all::RepeatAll>,
+    pub sounds: music::soundboard::store::SoundStore,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -63,6 +68,7 @@ pub fn commands() -> Vec<poise::Command<Data, Error>> {
         music::stop(),
         music::volume(),
         music::soundboard::effect(),
+        music::soundboard::soundboard(),
         music::soundboard::stream(),
         fun::choose(),
         fun::coinflip(),
@@ -165,6 +171,7 @@ pub async fn build_client(
                 Ok(Data {
                     http_client: data_http_client,
                     repeat_all: Default::default(),
+                    sounds: music::soundboard::store::SoundStore::new(SOUNDBOARD_DIR),
                 })
             })
         })

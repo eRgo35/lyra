@@ -47,6 +47,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --create-home --home-dir /home/lyra lyra
+# Soundboard sounds live in /home/lyra/data (a volume in compose.yaml).
+RUN install -d -o lyra -g lyra /home/lyra/data
 COPY --from=build /usr/local/bin/lyra /usr/local/bin/lyra
 COPY --from=tools /deno /usr/local/bin/deno
 # Owned by lyra so `yt-dlp -U` in the entrypoint can replace it.
