@@ -236,3 +236,39 @@ async fn lookups_send_a_user_agent() {
             .is_ok()
     );
 }
+
+#[tokio::test]
+async fn lyrics_pick_the_first_result_with_lyrics() {
+    use lyra::commands::music::lyrics::fetch_lyrics;
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/api/search"))
+        .and(query_param("q", "rick astley never gonna"))
+        .respond_with(json(
+            200,
+            r#"[{"trackName": "Never Gonna (Karaoke)", "artistName": "Nobody", "plainLyrics": null},
+                {"trackName": "Never Gonna Give You Up", "artistName": "Rick Astley",
+                 "instrumental": false, "plainLyrics": "We're no strangers to love\n"}]"#,
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
+    assert_eq!(
+        fetch_lyrics(
+            &reqwest::Client::new(),
+            &server.uri(),
+            "rick astley never gonna"
+        )
+        .await,
+        Ok((
+            "Rick Astley – Never Gonna Give You Up".to_string(),
+            "We're no strangers to love".to_string()
+        ))
+    );
+
+    let server = serve("/api/search", json(200, "[]")).await;
+    assert_eq!(
+        fetch_lyrics(&reqwest::Client::new(), &server.uri(), "zzqq").await,
+        Err("No lyrics found for \"zzqq\"!".to_string())
+    );
+}

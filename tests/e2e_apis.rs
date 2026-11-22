@@ -108,3 +108,18 @@ async fn whois_and_ip_via_rdap() {
     let (_, description) = fetch_ip(&client, RDAP_API, address).await.unwrap();
     assert!(description.contains("APNIC"), "{description}");
 }
+
+#[tokio::test]
+#[ignore = "network: lrclib.net"]
+async fn lyrics_for_a_real_song() {
+    use lyra::commands::music::lyrics::{fetch_lyrics, LRCLIB_API};
+    let (title, lyrics) = fetch_lyrics(
+        &reqwest::Client::new(),
+        LRCLIB_API,
+        "Rick Astley - Never Gonna Give You Up",
+    )
+    .await
+    .unwrap();
+    assert!(title.contains("Never Gonna Give You Up"), "{title}");
+    assert!(lyrics.contains("strangers to love"), "{lyrics}");
+}

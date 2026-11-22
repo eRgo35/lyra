@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Music: `nowplaying` (`np`) with a progress bar, `lyrics [song]` (lrclib.net;
+  the current track by default), `shuffle`, `remove <n>` (`rm`), `move <from>
+  <to>` (`mv`) and `clear`. Tracks removed with `remove` or `clear` stay
+  removed with `repeat all` on.
 - Fun commands: `8ball`, `coinflip`, `choose a | b | c`, `rps` and `mock`.
   `dice` (now also `roll`) takes dice notation like `2d20+3`. These are listed
   under a new "Fun" category in `help` (#12).
@@ -38,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `seek` shows times past an hour as `h:mm:ss` instead of `62:03`.
 - `uptime` uses singular units ("1 minute") and says "0 seconds" right
   after start.
 - The track error logger was registered again on every `play` and soundboard

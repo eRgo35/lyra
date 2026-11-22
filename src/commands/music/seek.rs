@@ -123,9 +123,19 @@ impl SeekTarget {
     }
 }
 
-fn format_time(duration: Duration) -> String {
+/// `mm:ss`, or `h:mm:ss` from an hour on.
+pub(super) fn format_time(duration: Duration) -> String {
     let seconds = duration.as_secs();
-    format!("{:02}:{:02}", seconds / 60, seconds % 60)
+    if seconds >= 3600 {
+        format!(
+            "{}:{:02}:{:02}",
+            seconds / 3600,
+            seconds / 60 % 60,
+            seconds % 60
+        )
+    } else {
+        format!("{:02}:{:02}", seconds / 60, seconds % 60)
+    }
 }
 
 #[cfg(test)]
@@ -168,6 +178,7 @@ mod tests {
     fn formats_minutes_and_seconds() {
         assert_eq!(format_time(secs(0)), "00:00");
         assert_eq!(format_time(secs(90)), "01:30");
-        assert_eq!(format_time(secs(3723)), "62:03");
+        assert_eq!(format_time(secs(3599)), "59:59");
+        assert_eq!(format_time(secs(3723)), "1:02:03");
     }
 }
