@@ -123,3 +123,23 @@ async fn lyrics_for_a_real_song() {
     assert!(title.contains("Never Gonna Give You Up"), "{title}");
     assert!(lyrics.contains("strangers to love"), "{lyrics}");
 }
+
+#[tokio::test]
+#[ignore = "network: mcsrvstat.us, api.mojang.com"]
+async fn minecraft_server_and_player() {
+    use lyra::commands::tools::mcplayer::{fetch_player, MOJANG_API, SKIN_RENDERS};
+    use lyra::commands::tools::mcstatus::{fetch_status, MCSRVSTAT_API};
+    let client = reqwest::Client::new();
+
+    let card = fetch_status(&client, MCSRVSTAT_API, "2b2t.org")
+        .await
+        .unwrap();
+    assert!(card.description.contains("Online"), "{}", card.description);
+
+    let card = fetch_player(&client, MOJANG_API, SKIN_RENDERS, "Notch")
+        .await
+        .unwrap();
+    assert_eq!(card.title, "Notch");
+    let render = client.get(card.image.unwrap()).send().await.unwrap();
+    assert!(render.status().is_success());
+}

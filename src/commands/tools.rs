@@ -10,6 +10,8 @@ pub mod dictionary;
 pub mod help;
 pub mod ip;
 pub mod lookup;
+pub mod mcplayer;
+pub mod mcstatus;
 pub mod metar;
 // poise's #[rest] codegen trips unreachable_code on Rust 1.100+
 #[allow(unreachable_code)]
@@ -35,6 +37,8 @@ pub use dice::dice;
 pub use dictionary::dictionary;
 pub use help::help;
 pub use ip::ip;
+pub use mcplayer::mcplayer;
+pub use mcstatus::mcstatus;
 pub use metar::metar;
 pub use owoify::owoify;
 pub use ping::ping;
