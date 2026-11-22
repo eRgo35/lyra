@@ -72,6 +72,7 @@ pub fn commands() -> Vec<poise::Command<Data, Error>> {
         tools::uptime(),
         tools::verse(),
         tools::weather(),
+        tools::whois(),
     ]
 }
 

@@ -141,7 +141,11 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `verse [latin] <book chapter:verse>` | | Look up a Bible verse (WEB translation, or Clementine Vulgate with `latin`). |
 | `owoify <text>` | | Owoify text. |
 | `ai <prompt>` | | A joke: replies with a canned "as an AI language model" apology. No model is involved. |
-| `ip`, `metar`, `taf`, `weather` | | Placeholders that currently reply "Work in progress". |
+| `weather <place>` | | Current weather for a city or place ([Open-Meteo](https://open-meteo.com)). |
+| `metar <ICAO>` | | Latest airport weather report, raw and decoded ([aviationweather.gov](https://aviationweather.gov)). |
+| `taf <ICAO>` | | Airport forecast, one line per change group. |
+| `whois <domain>` | | Domain registrar, dates, status and name servers (RDAP). |
+| `ip <address or hostname>` | | Network, owner, country and abuse contact for a public IP (RDAP). Private addresses are refused. |
 
 A hidden, owner-only prefix command `register` re-registers slash commands with buttons; you do not
 need it for normal setup because slash commands are registered at startup.
