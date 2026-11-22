@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-22
+
 ### Fixed
 
 - No sound from many YouTube tracks (403 Forbidden): YouTube now refuses some
@@ -391,3 +393,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.17.0]: https://github.com/eRgo35/lyra/compare/v0.16.0...v0.17.0
 [0.17.1]: https://github.com/eRgo35/lyra/compare/v0.17.0...v0.17.1
 [0.18.0]: https://github.com/eRgo35/lyra/compare/v0.17.1...v0.18.0
+[0.19.0]: https://github.com/eRgo35/lyra/compare/v0.18.0...v0.19.0
