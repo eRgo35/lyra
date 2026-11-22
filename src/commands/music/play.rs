@@ -206,9 +206,9 @@ fn move_to_front<T>(queue: &mut VecDeque<T>, new_index: usize) {
 }
 
 /// A track to enqueue: the yt-dlp query, plus its metadata when it is already known.
-struct Entry {
-    query: String,
-    metadata: Option<AuxMetadata>,
+pub struct Entry {
+    pub query: String,
+    pub metadata: Option<AuxMetadata>,
 }
 
 impl Entry {
@@ -220,7 +220,8 @@ impl Entry {
     }
 }
 
-async fn parse_data(data: String) -> std::io::Result<VecDeque<Entry>> {
+/// Turns `play` input (search terms, URLs, playlists, Spotify links) into entries to enqueue.
+pub async fn parse_data(data: String) -> std::io::Result<VecDeque<Entry>> {
     let mut tracks = VecDeque::new();
 
     for track in spotify_parser::retrieve_async_url(&data)
