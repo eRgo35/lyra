@@ -34,6 +34,32 @@ advisory not accepted in [`deny.toml`](deny.toml); add new exceptions there with
 Use `cargo fmt` to fix formatting. Please add or update unit tests for logic that can be tested
 without a Discord connection.
 
+### Tests
+
+`cargo test` runs offline: unit tests next to the code, and integration tests in `tests/`
+(`commands.rs` checks the command set and slash definitions; `http_apis.rs` runs `dictionary`
+and `verse` against a local mock server).
+
+The end-to-end tests talk to real services, so they are `#[ignore]`d and not run in CI. Run them
+locally before changing music sources or the API commands:
+
+```bash
+cargo test -- --ignored                      # all of them (needs network and yt-dlp)
+cargo test --test e2e_sources -- --ignored   # yt-dlp: YouTube / YouTube Music / search / Spotify
+cargo test --test e2e_apis -- --ignored      # dictionaryapi.dev, bible-api.com
+```
+
+`tests/e2e_discord.rs` logs the bot in and checks that its slash commands get registered. It
+needs a bot token and a test guild the bot is in, under variables separate from `.env`, and
+overwrites that guild's slash commands:
+
+```bash
+LYRA_E2E_DISCORD_TOKEN=... LYRA_E2E_GUILD_ID=... \
+    cargo test --test e2e_discord -- --ignored --nocapture
+```
+
+Without those variables it prints `skipped` and passes.
+
 ## Changelog
 
 User-visible changes (features, fixes, behaviour or dependency changes, docs worth noting) must be
