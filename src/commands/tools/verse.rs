@@ -1,5 +1,5 @@
 use crate::{
-    commands::embeds::{embed, error_embed},
+    commands::embeds::{embed, error_embed, with_detail},
     Context, Error,
 };
 use poise::CreateReply;
@@ -60,14 +60,14 @@ pub async fn fetch_verse(
         .await
         .map_err(|e| {
             warn!("Bible API request failed: {e}");
-            "Could not reach the Bible API!".to_string()
+            with_detail("Could not reach the Bible API!", &e)
         })?;
 
     match response.status() {
         reqwest::StatusCode::OK => {
             let found = response.json::<Verse>().await.map_err(|e| {
                 warn!("Could not parse Bible API response: {e}");
-                "Could not read the Bible API response!".to_string()
+                with_detail("Could not read the Bible API response!", &e)
             })?;
             if found.text.len() > MAX_TEXT_LEN {
                 return Err("Quoted text is too long!".to_string());
