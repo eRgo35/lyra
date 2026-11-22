@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `uptime` uses singular units ("1 minute") and says "0 seconds" right
+  after start.
 - The track error logger was registered again on every `play` and soundboard
   command; it is now registered once when the bot joins.
 - Enqueueing playlists is much faster. YouTube playlist tracks reuse the
@@ -85,9 +87,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path, i.e. those three items under "Security (known, unresolved)" in 0.11.2.
   No Lyra source change; a real `wss://gateway.discord.gg` handshake was
   verified. Remove the patch when serenity 0.13 is released.
-- Still unresolved: RUSTSEC-2026-0381 (`webpki-roots 0.26.11`, needs 1.x), the
-  lock-only `libcrux` advisories, `ringbuf` 0.4.8 (RUSTSEC-2026-0293) and the
-  unmaintained-crate warnings.
+- RUSTSEC-2026-0381 (`webpki-roots`) is resolved: 0.26.11 is a shim over
+  1.0.10, which has the fix, and the advisory now lists it as unaffected.
+- Still unresolved: the lock-only `libcrux` advisories, `ringbuf` 0.4.8
+  (RUSTSEC-2026-0293), `crypto-bigint` 0.5.5 (RUSTSEC-2026-0387) and the
+  unmaintained-crate warnings; all are accepted in `deny.toml` with reasons.
 
 ## [0.11.2] - 2026-10-20
 
