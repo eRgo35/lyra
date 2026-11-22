@@ -5,7 +5,7 @@ use poise::serenity_prelude::{
 };
 use poise::CreateReply;
 use songbird::input::AuxMetadata;
-use songbird::input::{Compose, YoutubeDl};
+use songbird::input::Compose;
 use std::time::Duration;
 
 use crate::http::HttpKey;
@@ -67,7 +67,7 @@ pub async fn effect(
     Ok(())
 }
 
-async fn generate_embed(ctx: Context<'_>, src: YoutubeDl<'_>) -> Result<CreateEmbed, Error> {
+async fn generate_embed(ctx: Context<'_>, src: crate::http::Ytdl) -> Result<CreateEmbed, Error> {
     let metadata = src.clone().aux_metadata().await.unwrap();
     let AuxMetadata {
         title,
