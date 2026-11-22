@@ -130,6 +130,7 @@ fn format_time(duration: Duration) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::format_time;
     use super::SeekTarget::{self, Back, Forward, To};
     use std::time::Duration;
 
@@ -161,5 +162,12 @@ mod tests {
         assert_eq!(To(secs(90)).resolve(secs(10)), secs(90));
         assert_eq!(Forward(secs(30)).resolve(secs(10)), secs(40));
         assert_eq!(Back(secs(15)).resolve(secs(10)), secs(0));
+    }
+
+    #[test]
+    fn formats_minutes_and_seconds() {
+        assert_eq!(format_time(secs(0)), "00:00");
+        assert_eq!(format_time(secs(90)), "01:30");
+        assert_eq!(format_time(secs(3723)), "62:03");
     }
 }

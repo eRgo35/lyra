@@ -168,3 +168,22 @@ pub async fn build_client(
         .await
         .map_err(Into::into)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_guild_id;
+
+    #[test]
+    fn guild_id_is_optional_and_trimmed() {
+        assert_eq!(parse_guild_id(None), Ok(None));
+        assert_eq!(parse_guild_id(Some(" 1234 ")), Ok(Some(1234)));
+    }
+
+    #[test]
+    fn invalid_guild_id_is_an_error_naming_the_value() {
+        let err = parse_guild_id(Some("abc")).unwrap_err();
+        assert!(err.contains("\"abc\""), "{err}");
+        assert!(parse_guild_id(Some("")).is_err());
+        assert!(parse_guild_id(Some("-1")).is_err());
+    }
+}

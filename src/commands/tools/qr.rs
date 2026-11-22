@@ -22,11 +22,7 @@ pub async fn qr(
 
 async fn generate_embed(ctx: Context<'_>, message: String) -> Result<CreateEmbed, Error> {
     let timestamp = Timestamp::now();
-    let data: String = form_urlencoded::byte_serialize(message.as_bytes()).collect();
-    let url = format!(
-        "http://api.qrserver.com/v1/create-qr-code/?data={}&size=1000x1000&ecc=Q&margin=8",
-        data
-    );
+    let url = qr_url(&message);
 
     let embed = CreateEmbed::default()
         .author(
@@ -44,4 +40,27 @@ async fn generate_embed(ctx: Context<'_>, message: String) -> Result<CreateEmbed
         );
 
     Ok(embed)
+}
+
+/// QR code image URL for `message` (URL-encoded into the `data` parameter).
+fn qr_url(message: &str) -> String {
+    let data: String = form_urlencoded::byte_serialize(message.as_bytes()).collect();
+    format!(
+        "http://api.qrserver.com/v1/create-qr-code/?data={}&size=1000x1000&ecc=Q&margin=8",
+        data
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::qr_url;
+
+    #[test]
+    fn encodes_the_message_so_it_cannot_add_parameters() {
+        let url = qr_url("hi there&size=1x1#x/ż");
+        assert_eq!(
+            url,
+            "http://api.qrserver.com/v1/create-qr-code/?data=hi+there%26size%3D1x1%23x%2F%C5%BC&size=1000x1000&ecc=Q&margin=8"
+        );
+    }
 }

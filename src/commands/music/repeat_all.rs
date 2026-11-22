@@ -35,19 +35,21 @@ impl RepeatAll {
 
     /// Don't requeue `track` when it next ends (only recorded while `repeat all` is on).
     pub fn skip_once(&self, guild_id: GuildId, track: &TrackHandle) {
+        self.mark_skip(guild_id, track.uuid().as_u128());
+    }
+
+    fn mark_skip(&self, guild_id: GuildId, track: u128) {
         if self.is_enabled(guild_id) {
-            self.skip_once
-                .lock()
-                .unwrap()
-                .insert(track.uuid().as_u128());
+            self.skip_once.lock().unwrap().insert(track);
         }
     }
 
     fn take_skip(&self, track: &TrackHandle) -> bool {
-        self.skip_once
-            .lock()
-            .unwrap()
-            .remove(&track.uuid().as_u128())
+        self.take_skip_id(track.uuid().as_u128())
+    }
+
+    fn take_skip_id(&self, track: u128) -> bool {
+        self.skip_once.lock().unwrap().remove(&track)
     }
 }
 
@@ -120,5 +122,47 @@ impl EventHandler for RequeueOnEnd {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RepeatAll;
+    use serenity::all::GuildId;
+
+    const GUILD: GuildId = GuildId::new(1);
+    const OTHER: GuildId = GuildId::new(2);
+
+    #[test]
+    fn enabling_is_per_guild() {
+        let repeat = RepeatAll::default();
+        assert!(!repeat.is_enabled(GUILD));
+
+        repeat.set(GUILD, true);
+        assert!(repeat.is_enabled(GUILD));
+        assert!(!repeat.is_enabled(OTHER));
+
+        repeat.set(GUILD, false);
+        assert!(!repeat.is_enabled(GUILD));
+    }
+
+    #[test]
+    fn skip_marker_is_consumed_once() {
+        let repeat = RepeatAll::default();
+        repeat.set(GUILD, true);
+        repeat.mark_skip(GUILD, 42);
+
+        assert!(repeat.take_skip_id(42));
+        assert!(!repeat.take_skip_id(42));
+    }
+
+    #[test]
+    fn skip_marker_is_not_recorded_while_disabled() {
+        // Otherwise it would leak, and wrongly suppress a later requeue once enabled.
+        let repeat = RepeatAll::default();
+        repeat.mark_skip(GUILD, 42);
+        repeat.set(GUILD, true);
+
+        assert!(!repeat.take_skip_id(42));
     }
 }
