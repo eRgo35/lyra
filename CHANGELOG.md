@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Working `weather`, `metar` and `taf` commands (they used to reply "Work in
+  progress"), plus new `whois <domain>` and `ip <address or hostname>`. All use
+  free services that need no API key: Open-Meteo, aviationweather.gov and RDAP
+  via rdap.org. `ip` refuses private and reserved addresses, so it can't reveal
+  the bot host's network (#12).
 - Docker image (`ghcr.io/ergo35/lyra`, published on every release) with
   `yt-dlp` (self-updating on start), `deno` and `ffmpeg`, plus `compose.yaml`:
   `cp .env.example .env && docker compose up -d`. Restarts on crashes and

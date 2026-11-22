@@ -53,3 +53,58 @@ async fn verse_reports_unknown_references() {
         Err("Verse \"notabook 99:99\" not found!".to_string())
     );
 }
+
+#[tokio::test]
+#[ignore = "network: aviationweather.gov"]
+async fn metar_and_taf_for_a_real_airport() {
+    use lyra::commands::tools::metar::{fetch_metar, AVIATION_WEATHER_API};
+    use lyra::commands::tools::taf::fetch_taf;
+    let client = reqwest::Client::new();
+
+    let (title, description) = fetch_metar(&client, AVIATION_WEATHER_API, "KJFK")
+        .await
+        .unwrap();
+    assert!(title.starts_with("KJFK"), "{title}");
+    assert!(description.contains("KJFK"), "{description}");
+
+    let (_, description) = fetch_taf(&client, AVIATION_WEATHER_API, "KJFK")
+        .await
+        .unwrap();
+    assert!(description.contains("TAF"), "{description}");
+}
+
+#[tokio::test]
+#[ignore = "network: open-meteo.com"]
+async fn weather_for_a_real_city() {
+    use lyra::commands::tools::weather::{fetch_weather, FORECAST_API, GEOCODING_API};
+    let (title, description) = fetch_weather(
+        &reqwest::Client::new(),
+        GEOCODING_API,
+        FORECAST_API,
+        "Warsaw",
+    )
+    .await
+    .unwrap();
+    assert!(title.contains("Poland"), "{title}");
+    assert!(description.contains("°C"), "{description}");
+}
+
+#[tokio::test]
+#[ignore = "network: rdap.org"]
+async fn whois_and_ip_via_rdap() {
+    use lyra::commands::tools::ip::{fetch_ip, resolve};
+    use lyra::commands::tools::whois::{fetch_domain, RDAP_API};
+    let client = reqwest::Client::new();
+
+    let (_, description) = fetch_domain(&client, RDAP_API, "example.com")
+        .await
+        .unwrap();
+    assert!(
+        description.contains("**Registered:** 1995-08-14"),
+        "{description}"
+    );
+
+    let address = resolve("one.one.one.one").await.unwrap();
+    let (_, description) = fetch_ip(&client, RDAP_API, address).await.unwrap();
+    assert!(description.contains("APNIC"), "{description}");
+}

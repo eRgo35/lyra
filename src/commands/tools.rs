@@ -7,6 +7,7 @@ pub mod dice;
 pub mod dictionary;
 pub mod help;
 pub mod ip;
+pub mod lookup;
 pub mod metar;
 // poise's #[rest] codegen trips unreachable_code on Rust 1.100+
 #[allow(unreachable_code)]
@@ -25,6 +26,7 @@ pub mod verse;
 // poise's #[rest] codegen trips unreachable_code on Rust 1.100+
 #[allow(unreachable_code)]
 pub mod weather;
+pub mod whois;
 
 pub use ai::ai;
 pub use dice::dice;
@@ -41,3 +43,4 @@ pub use taf::taf;
 pub use uptime::uptime;
 pub use verse::verse;
 pub use weather::weather;
+pub use whois::whois;
