@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `repeat` modes: `repeat one` loops the current track, `repeat all` loops
+  the whole queue (finished and skipped tracks are enqueued again at the
+  end), `repeat <n>` loops the current track n times and `repeat off` turns
+  both off. The modes are exclusive; `stop` and `leave` turn `all` off, and
+  `queue` shows the active mode (#11).
 - `jump <position>` (`j`) skips to a queue position as numbered by `queue`,
   dropping the tracks before it (#10).
 - `forceplay` (`fp`, `playnow`) plays a track immediately; the interrupted
@@ -18,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The track error logger was registered again on every `play` and soundboard
+  command; it is now registered once when the bot joins.
 - Enqueueing playlists is much faster. YouTube playlist tracks reuse the
   title, duration, channel and thumbnail from the single `--flat-playlist`
   call instead of one `yt-dlp` run per track (a 200-track playlist went from

@@ -6,6 +6,7 @@ use poise::serenity_prelude::{
 };
 use poise::CreateReply;
 use songbird::input::AuxMetadata;
+use songbird::tracks::LoopState;
 
 const QUEUE_DISPLAY_LENGTH: usize = 10;
 
@@ -63,6 +64,23 @@ pub async fn queue(ctx: Context<'_>) -> Result<(), Error> {
                 "and {} more...",
                 queue.len() - QUEUE_DISPLAY_LENGTH
             ));
+        }
+
+        let repeat = if ctx.data().repeat_all.is_enabled(guild_id) {
+            Some("all".to_string())
+        } else if let Some(track) = queue.current() {
+            match track.get_info().await.map(|info| info.loops) {
+                Ok(LoopState::Infinite) => Some("one".to_string()),
+                Ok(LoopState::Finite(n)) if n.get() > 0 => {
+                    Some(format!("this track {n} more times"))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if let Some(repeat) = repeat {
+            queue_res.push_str(&format!("\nRepeat: {repeat}"));
         }
 
         ctx.send(CreateReply::default().embed(embed(ctx, queue_res).await.unwrap()))

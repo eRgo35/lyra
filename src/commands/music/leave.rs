@@ -29,6 +29,7 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
+    ctx.data().repeat_all.set(guild_id, false);
     if let Err(err) = manager.remove(guild_id).await {
         fail(ctx, err.to_string()).await.unwrap();
     }

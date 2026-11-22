@@ -1,16 +1,15 @@
 use crate::commands::music::notifier::TrackErrorNotifier;
+use crate::commands::music::repeat_all::Enqueuer;
 use crate::{commands::embeds::error_embed, Context, Error};
 
 use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
 use poise::CreateReply;
-use reqwest::Client;
-use serenity::all::GuildId;
 use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
-use songbird::tracks::{Track, TrackQueue};
+use songbird::tracks::TrackQueue;
 use songbird::Call;
 use spotify_parser;
 use std::collections::VecDeque;
@@ -45,8 +44,13 @@ pub async fn play(
 /// interrupted track is queued right after it, from the beginning.
 pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
-    let http_client = ctx.data().http_client.clone();
     let manager = songbird::get(ctx.serenity_context()).await.unwrap().clone();
+    let enqueuer = Enqueuer {
+        manager: manager.clone(),
+        guild_id,
+        http_client: ctx.data().http_client.clone(),
+        repeat: ctx.data().repeat_all.clone(),
+    };
 
     let mut rest_playlist: VecDeque<Entry> = VecDeque::new();
 
@@ -72,7 +76,7 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
             let mut handler = handler_lock.lock().await;
             handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
-            rest_playlist = handle_play(ctx, song, handler, http_client.clone(), force).await?;
+            rest_playlist = handle_play(ctx, song, handler, &enqueuer, force).await?;
         } else {
             let msg = "Failed to join the voice channel!";
             ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
@@ -80,12 +84,11 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
         }
     } else {
         let handler = manager.get(guild_id).unwrap();
-        let mut handler = handler.lock().await;
-        handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
-        rest_playlist = handle_play(ctx, song, handler, http_client.clone(), force).await?;
+        let handler = handler.lock().await;
+        rest_playlist = handle_play(ctx, song, handler, &enqueuer, force).await?;
     }
 
-    handle_playlist(rest_playlist, manager, guild_id, http_client).await?;
+    handle_playlist(rest_playlist, &enqueuer).await?;
 
     Ok(())
 }
@@ -94,7 +97,7 @@ async fn handle_play<'a>(
     ctx: Context<'a>,
     song: String,
     mut handler: tokio::sync::MutexGuard<'a, Call>,
-    http_client: Client,
+    enqueuer: &Enqueuer,
     force: bool,
 ) -> Result<VecDeque<Entry>, Error> {
     let mut results = match parse_data(song).await {
@@ -124,11 +127,9 @@ async fn handle_play<'a>(
         results.clear();
     }
 
-    let src: YoutubeDl = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), first.query);
-
     let aux_metadata = match first.metadata {
         Some(metadata) => metadata,
-        None => match src.clone().aux_metadata().await {
+        None => match lookup_metadata(enqueuer, first.query.clone()).await {
             Ok(metadata) => metadata,
             Err(e) => {
                 warn!("Failed to load track metadata: {e}");
@@ -154,15 +155,12 @@ async fn handle_play<'a>(
     )
     .await?;
 
-    handler
-        .enqueue(Track::new_with_data(
-            src.clone().into(),
-            Arc::new(aux_metadata),
-        ))
+    enqueuer
+        .enqueue(&mut handler, first.query, aux_metadata)
         .await;
 
     if force && handler.queue().len() > 1 {
-        play_now(&mut handler, http_client).await;
+        play_now(&mut handler, enqueuer).await;
     }
 
     Ok(results)
@@ -170,7 +168,7 @@ async fn handle_play<'a>(
 
 /// Moves the last enqueued track to the front and starts it, queueing a fresh copy of
 /// the interrupted track right after it (songbird tracks cannot be restarted in place).
-async fn play_now(handler: &mut Call, http_client: Client) {
+async fn play_now(handler: &mut Call, enqueuer: &Enqueuer) {
     let queue = handler.queue().clone();
     let Some(current) = queue.current() else {
         return;
@@ -180,10 +178,9 @@ async fn play_now(handler: &mut Call, http_client: Client) {
     let metadata = (*current.data::<AuxMetadata>()).clone();
     match metadata.source_url.clone() {
         Some(url) => {
-            let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, url);
-            handler
-                .enqueue(Track::new_with_data(src.into(), Arc::new(metadata)))
-                .await;
+            // The copy below replaces the interrupted track, so `repeat all` must not add another.
+            enqueuer.repeat.skip_once(enqueuer.guild_id, &current);
+            enqueuer.enqueue(handler, url, metadata).await;
         }
         None => warn!("Interrupted track has no source URL; it will not be resumed"),
     }
@@ -295,35 +292,39 @@ fn playlist_entries(output: &str) -> Vec<Entry> {
 /// How many yt-dlp metadata lookups run at once for entries without known metadata.
 const METADATA_LOOKUPS: usize = 4;
 
-async fn handle_playlist(
-    playlist: VecDeque<Entry>,
-    manager: std::sync::Arc<songbird::Songbird>,
-    guild_id: GuildId,
-    http_client: Client,
-) -> Result<(), Error> {
+async fn lookup_metadata(
+    enqueuer: &Enqueuer,
+    query: String,
+) -> Result<AuxMetadata, songbird::input::AudioStreamError> {
+    YoutubeDl::new_ytdl_like("yt-dlp", enqueuer.http_client.clone(), query)
+        .aux_metadata()
+        .await
+}
+
+async fn handle_playlist(playlist: VecDeque<Entry>, enqueuer: &Enqueuer) -> Result<(), Error> {
     let lookups = Arc::new(Semaphore::new(METADATA_LOOKUPS));
 
     // Start all lookups up front (bounded by the semaphore) but enqueue in playlist order.
     let pending = playlist
         .into_iter()
         .map(|entry| {
-            let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), entry.query.clone());
             let lookups = lookups.clone();
+            let enqueuer = enqueuer.clone();
             tokio::spawn(async move {
                 let metadata = match entry.metadata {
                     Some(metadata) => Ok(metadata),
                     None => {
                         let _permit = lookups.acquire().await;
-                        src.clone().aux_metadata().await
+                        lookup_metadata(&enqueuer, entry.query.clone()).await
                     }
                 };
-                (entry.query, src, metadata)
+                (entry.query, metadata)
             })
         })
         .collect::<Vec<_>>();
 
     for lookup in pending {
-        let (query, src, metadata) = lookup.await?;
+        let (query, metadata) = lookup.await?;
         let metadata = match metadata {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -333,13 +334,11 @@ async fn handle_playlist(
         };
 
         // The bot may have left the channel while the playlist was loading.
-        let Some(handler) = manager.get(guild_id) else {
+        let Some(handler) = enqueuer.manager.get(enqueuer.guild_id) else {
             break;
         };
-        handler
-            .lock()
-            .await
-            .enqueue(Track::new_with_data(src.into(), Arc::new(metadata)))
+        enqueuer
+            .enqueue(&mut *handler.lock().await, query, metadata)
             .await;
     }
 
