@@ -3,6 +3,7 @@ pub mod deafen;
 #[allow(unreachable_code)]
 pub mod forceplay;
 pub mod join;
+pub mod jump;
 pub mod leave;
 pub mod mute;
 pub mod notifier;
@@ -22,6 +23,7 @@ pub mod volume;
 pub use deafen::deafen;
 pub use forceplay::forceplay;
 pub use join::join;
+pub use jump::jump;
 pub use leave::leave;
 pub use mute::mute;
 pub use pause::pause;
