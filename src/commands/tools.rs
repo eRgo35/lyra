@@ -22,6 +22,9 @@ pub mod posix;
 #[allow(unreachable_code)]
 pub mod qr;
 pub mod register;
+// poise's #[rest] codegen trips unreachable_code on Rust 1.100+
+#[allow(unreachable_code)]
+pub mod remind;
 pub mod serverinfo;
 pub mod taf;
 pub mod uptime;
@@ -47,6 +50,7 @@ pub use ping::ping;
 pub use posix::posix;
 pub use qr::qr;
 pub use register::register;
+pub use remind::remind;
 pub use serverinfo::serverinfo;
 pub use taf::taf;
 pub use uptime::uptime;

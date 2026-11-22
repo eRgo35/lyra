@@ -1,10 +1,11 @@
 //! Custom soundboard sounds, one JSON file per guild under `data/soundboard/`.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use tracing::error;
+
+use crate::storage::{read_json, write_json};
 
 pub const MAX_SOUNDS: usize = 100;
 const MAX_NAME: usize = 32;
@@ -60,7 +61,7 @@ impl SoundStore {
 
     pub async fn list(&self, guild_id: u64) -> Result<Vec<Sound>, String> {
         let _guard = self.lock.lock().await;
-        Ok(read(&self.path(guild_id)).await?.sounds)
+        Ok(read_json::<Board>(&self.path(guild_id)).await?.sounds)
     }
 
     pub async fn get(&self, guild_id: u64, name: &str) -> Result<Sound, String> {
@@ -74,7 +75,7 @@ impl SoundStore {
     pub async fn add(&self, guild_id: u64, sound: Sound) -> Result<(), String> {
         let _guard = self.lock.lock().await;
         let path = self.path(guild_id);
-        let mut board = read(&path).await?;
+        let mut board = read_json::<Board>(&path).await?;
         if board.sounds.iter().any(|s| s.name == sound.name) {
             return Err(format!("There already is a sound called `{}`!", sound.name));
         }
@@ -85,7 +86,7 @@ impl SoundStore {
         }
         board.sounds.push(sound);
         board.sounds.sort_by(|a, b| a.name.cmp(&b.name));
-        write(&path, &board).await
+        write_json(&path, &board).await
     }
 
     /// Removes `name` if `allowed` says the caller may remove that sound.
@@ -97,7 +98,7 @@ impl SoundStore {
     ) -> Result<Sound, String> {
         let _guard = self.lock.lock().await;
         let path = self.path(guild_id);
-        let mut board = read(&path).await?;
+        let mut board = read_json::<Board>(&path).await?;
         let index = board
             .sounds
             .iter()
@@ -110,42 +111,9 @@ impl SoundStore {
             );
         }
         let removed = board.sounds.remove(index);
-        write(&path, &board).await?;
+        write_json(&path, &board).await?;
         Ok(removed)
     }
-}
-
-const STORAGE_ERROR: &str = "The soundboard storage is not working; see the bot's logs.";
-
-async fn read(path: &Path) -> Result<Board, String> {
-    match tokio::fs::read(path).await {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| {
-            // Never overwrite a file we can't read: the sounds would be lost.
-            error!("{} is not a valid soundboard file: {e}", path.display());
-            STORAGE_ERROR.to_string()
-        }),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Board::default()),
-        Err(e) => {
-            error!("Could not read {}: {e}", path.display());
-            Err(STORAGE_ERROR.to_string())
-        }
-    }
-}
-
-/// Writes to a temporary file and renames it over `path`, so a crash never leaves
-/// half a file behind.
-async fn write(path: &Path, board: &Board) -> Result<(), String> {
-    let fail = |e: std::io::Error| {
-        error!("Could not write {}: {e}", path.display());
-        STORAGE_ERROR.to_string()
-    };
-    if let Some(dir) = path.parent() {
-        tokio::fs::create_dir_all(dir).await.map_err(fail)?;
-    }
-    let json = serde_json::to_vec_pretty(board).expect("sounds serialize");
-    let temporary = path.with_extension("json.tmp");
-    tokio::fs::write(&temporary, json).await.map_err(fail)?;
-    tokio::fs::rename(&temporary, path).await.map_err(fail)
 }
 
 #[cfg(test)]

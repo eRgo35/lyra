@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `remind [dm] <when> <text>` (`/remind set`), `remind list` and `remind
+  cancel <id>`. Reminders are kept in `data/reminders.json`, so they survive
+  restarts; ones that came due while the bot was offline are delivered late
+  with a note. They only ever ping their owner, and a channel reminder that
+  can't be posted is sent as a DM.
 - `urban <term>` (Urban Dictionary, shown behind spoilers), `userinfo [user]`
   and `serverinfo`.
 - Minecraft: `mcstatus <server>` (online, MOTD, players, version via
