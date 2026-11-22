@@ -36,6 +36,14 @@ pub async fn play(
     #[rest]
     song: String,
 ) -> Result<(), Error> {
+    enqueue_song(ctx, song, false).await
+}
+
+/// Resolves `song` and enqueues it, joining the author's voice channel if needed.
+///
+/// With `force`, only the first resolved track is used: it starts immediately and the
+/// interrupted track is queued right after it, from the beginning.
+pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) -> Result<(), Error> {
     let guild_id = ctx.guild_id().unwrap();
     let http_client = ctx.data().http_client.clone();
     let manager = songbird::get(ctx.serenity_context()).await.unwrap().clone();
@@ -64,7 +72,7 @@ pub async fn play(
             let mut handler = handler_lock.lock().await;
             handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
-            rest_playlist = handle_play(ctx, song, handler, http_client.clone()).await?;
+            rest_playlist = handle_play(ctx, song, handler, http_client.clone(), force).await?;
         } else {
             let msg = "Failed to join the voice channel!";
             ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
@@ -74,7 +82,7 @@ pub async fn play(
         let handler = manager.get(guild_id).unwrap();
         let mut handler = handler.lock().await;
         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
-        rest_playlist = handle_play(ctx, song, handler, http_client.clone()).await?;
+        rest_playlist = handle_play(ctx, song, handler, http_client.clone(), force).await?;
     }
 
     handle_playlist(rest_playlist, manager, guild_id, http_client).await?;
@@ -87,6 +95,7 @@ async fn handle_play<'a>(
     song: String,
     mut handler: tokio::sync::MutexGuard<'a, Call>,
     http_client: Client,
+    force: bool,
 ) -> Result<VecDeque<Entry>, Error> {
     let mut results = match parse_data(song).await {
         Ok(results) => results,
@@ -110,7 +119,12 @@ async fn handle_play<'a>(
         return Ok(results);
     };
 
-    let src: YoutubeDl = YoutubeDl::new_ytdl_like("yt-dlp", http_client, first.query);
+    if force {
+        // forceplay takes a single track; the rest of a playlist is not enqueued.
+        results.clear();
+    }
+
+    let src: YoutubeDl = YoutubeDl::new_ytdl_like("yt-dlp", http_client.clone(), first.query);
 
     let aux_metadata = match first.metadata {
         Some(metadata) => metadata,
@@ -128,7 +142,14 @@ async fn handle_play<'a>(
 
     ctx.send(
         CreateReply::default().embed(
-            generate_embed(ctx, aux_metadata.clone(), handler.queue(), results.len()).await?,
+            generate_embed(
+                ctx,
+                aux_metadata.clone(),
+                handler.queue(),
+                results.len(),
+                force,
+            )
+            .await?,
         ),
     )
     .await?;
@@ -140,7 +161,51 @@ async fn handle_play<'a>(
         ))
         .await;
 
+    if force && handler.queue().len() > 1 {
+        play_now(&mut handler, http_client).await;
+    }
+
     Ok(results)
+}
+
+/// Moves the last enqueued track to the front and starts it, queueing a fresh copy of
+/// the interrupted track right after it (songbird tracks cannot be restarted in place).
+async fn play_now(handler: &mut Call, http_client: Client) {
+    let queue = handler.queue().clone();
+    let Some(current) = queue.current() else {
+        return;
+    };
+    let new_index = queue.len() - 1;
+
+    let metadata = (*current.data::<AuxMetadata>()).clone();
+    match metadata.source_url.clone() {
+        Some(url) => {
+            let src = YoutubeDl::new_ytdl_like("yt-dlp", http_client, url);
+            handler
+                .enqueue(Track::new_with_data(src.into(), Arc::new(metadata)))
+                .await;
+        }
+        None => warn!("Interrupted track has no source URL; it will not be resumed"),
+    }
+
+    queue.modify_queue(|q| move_to_front(q, new_index));
+
+    let _ = queue.skip();
+}
+
+/// `[current, .., new]` or `[current, .., new, requeued]` → `[current, new, requeued?, ..]`.
+fn move_to_front<T>(queue: &mut VecDeque<T>, new_index: usize) {
+    let requeued = if queue.len() - 1 > new_index {
+        queue.pop_back()
+    } else {
+        None
+    };
+    if let Some(new) = queue.remove(new_index) {
+        queue.insert(1, new);
+    }
+    if let Some(requeued) = requeued {
+        queue.insert(2, requeued);
+    }
 }
 
 /// A track to enqueue: the yt-dlp query, plus its metadata when it is already known.
@@ -286,6 +351,7 @@ async fn generate_embed(
     metadata: AuxMetadata,
     queue: &TrackQueue,
     remaining: usize,
+    force: bool,
 ) -> Result<CreateEmbed, Error> {
     let AuxMetadata {
         title,
@@ -304,7 +370,7 @@ async fn generate_embed(
         tracks = "Track enqueued";
     }
 
-    if queue.is_empty() {
+    if queue.is_empty() || force {
         description = "Playing now!".to_string();
     }
 
@@ -341,7 +407,8 @@ async fn generate_embed(
 
 #[cfg(test)]
 mod tests {
-    use super::playlist_entries;
+    use super::{move_to_front, playlist_entries};
+    use std::collections::VecDeque;
     use std::time::Duration;
 
     fn playlist_urls(output: &str) -> Vec<String> {
@@ -417,5 +484,24 @@ mod tests {
         assert_eq!(metadata.title, None);
         assert_eq!(metadata.artist, None);
         assert_eq!(metadata.duration, None);
+    }
+
+    #[test]
+    fn move_to_front_puts_new_track_next_and_requeued_after_it() {
+        // 0 = current, 9 = forceplayed, 10 = fresh copy of the interrupted track.
+        let mut queue = VecDeque::from([0, 1, 2, 9, 10]);
+        move_to_front(&mut queue, 3);
+        assert_eq!(queue, [0, 9, 10, 1, 2]);
+
+        let mut queue = VecDeque::from([0, 9, 10]);
+        move_to_front(&mut queue, 1);
+        assert_eq!(queue, [0, 9, 10]);
+    }
+
+    #[test]
+    fn move_to_front_without_requeued_track() {
+        let mut queue = VecDeque::from([0, 1, 2, 9]);
+        move_to_front(&mut queue, 3);
+        assert_eq!(queue, [0, 9, 1, 2]);
     }
 }
