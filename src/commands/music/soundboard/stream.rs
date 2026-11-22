@@ -4,12 +4,10 @@ use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
 use poise::CreateReply;
-use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
 use songbird::input::{Compose, YoutubeDl};
 use std::time::Duration;
 
-use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::http::HttpKey;
 
 /// Hijacks output and plays audio; \
@@ -57,8 +55,6 @@ pub async fn stream(
 
     if let Some(handler_lock) = manager.get(guild_id) {
         let mut handler = handler_lock.lock().await;
-
-        handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
 
         if is_query {
             song = format!("ytsearch:{}", song);

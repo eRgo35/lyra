@@ -117,7 +117,7 @@ Music commands only work inside a server. Aliases apply to prefix commands.
 | `jump <position>` | `j` | Skip to a queue position as numbered by `queue` (1 = next track); the tracks before it are dropped. |
 | `stop` | `end` | Stop playback and clear the queue (the bot stays in the channel). |
 | `queue` | `q` | Show the next tracks in the queue. |
-| `repeat <times>` | `loop`, `while`, `for` | Loop the current track. |
+| `repeat <off\|one\|all\|n>` | `loop`, `while`, `for` | `one` loops the current track forever, `n` loops it n more times, `all` loops the whole queue (finished and skipped tracks go back to the end), `off` turns repeating off. Shown in `queue`. |
 | `seek <position>` | | Jump to a position (`90`, `1:30`) or move by an offset (`+30`, `-15`) in the current track. |
 | `volume <percent>` | | Set the volume of the current track. |
 | `mute` | `shhh`, `unmute` | Toggle the bot's self-mute. |

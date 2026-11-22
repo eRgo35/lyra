@@ -24,6 +24,8 @@ pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
     if let Some(handler_lock) = manager.get(guild_id) {
         let handler = handler_lock.lock().await;
         let queue = handler.queue();
+        // Otherwise every stopped track would be put back into the queue.
+        ctx.data().repeat_all.set(guild_id, false);
         queue.stop();
 
         ctx.send(

@@ -18,6 +18,7 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 
 pub struct Data {
     pub http_client: HttpClient,
+    pub repeat_all: std::sync::Arc<music::repeat_all::RepeatAll>,
 }
 
 async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
@@ -151,6 +152,7 @@ async fn main() {
 
                 Ok(Data {
                     http_client: data_http_client,
+                    repeat_all: Default::default(),
                 })
             })
         })
