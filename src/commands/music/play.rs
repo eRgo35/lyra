@@ -43,6 +43,8 @@ pub async fn play(
 /// With `force`, only the first resolved track is used: it starts immediately and the
 /// interrupted track is queued right after it, from the beginning.
 pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) -> Result<(), Error> {
+    // Resolving with yt-dlp often takes longer than Discord's 3 s to acknowledge a slash command.
+    ctx.defer().await?;
     let guild_id = ctx.guild_id().unwrap();
     let manager = songbird::get(ctx.serenity_context()).await.unwrap().clone();
     let enqueuer = Enqueuer {

@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `/play` and `/forceplay` failing with "Unknown interaction" when yt-dlp takes
+  more than 3 seconds to resolve the track.
+
 ## [0.17.1] - 2026-11-22
 
 ### Added
