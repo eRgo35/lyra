@@ -10,3 +10,8 @@ updates:
     target-branch: "senpai"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/"
+    target-branch: "senpai"
+    schedule:
+      interval: "weekly"

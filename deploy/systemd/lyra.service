@@ -1,0 +1,48 @@
+# Lyra as a systemd service. Installed by deploy/systemd/install.sh; see README
+# "Running on a server". Configuration lives in /etc/lyra/lyra.env.
+[Unit]
+Description=Lyra Discord bot
+Documentation=https://github.com/eRgo35/lyra
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=lyra
+Group=lyra
+EnvironmentFile=/etc/lyra/lyra.env
+Environment=RUST_LOG=info
+# yt-dlp keeps its cache under $HOME / $XDG_CACHE_HOME.
+Environment=HOME=/var/lib/lyra
+Environment=XDG_CACHE_HOME=/var/cache/lyra
+StateDirectory=lyra
+CacheDirectory=lyra
+WorkingDirectory=/var/lib/lyra
+ExecStart=/usr/local/bin/lyra
+# Lyra shuts down cleanly on Ctrl-C (SIGINT).
+KillSignal=SIGINT
+Restart=always
+RestartSec=5
+
+# Sandboxing. No MemoryDenyWriteExecute: deno (yt-dlp's JS runtime) needs a JIT.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+# Run Lyra:  cp .env.example .env  (fill it in), then  docker compose up -d
+# Update:    docker compose pull && docker compose up -d
+# Build from this checkout instead of pulling:  docker compose up -d --build
+services:
+  lyra:
+    image: ghcr.io/ergo35/lyra:latest
+    build: .
+    env_file: .env
+    restart: unless-stopped
+    stop_signal: SIGINT
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
