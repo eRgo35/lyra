@@ -119,3 +119,61 @@ async fn spotify_track_becomes_a_youtube_search() {
         "{query}"
     );
 }
+
+/// One yt-dlp run, then songbird decodes the stream while it downloads into the
+/// audio cache; once downloaded, a second play comes from disk.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "network: YouTube via yt-dlp"]
+async fn looked_up_track_plays_through_the_audio_cache() {
+    use songbird::input::codecs::{get_codec_registry, get_probe};
+    use songbird::input::Input;
+    use std::time::{Duration, Instant};
+
+    // The cache lives under the working directory; keep it out of the repository.
+    let dir = std::env::temp_dir().join(format!("lyra-e2e-cache-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::env::set_current_dir(&dir).unwrap();
+    let cached = dir.join(lyra::AUDIO_CACHE_DIR).join("kPa7bsKwL-c.webm");
+
+    async fn first_packet(src: lyra::http::Ytdl) -> Duration {
+        let start = Instant::now();
+        let input = Input::from(src)
+            .make_playable_async(get_codec_registry(), get_probe())
+            .await
+            .expect("playable");
+        let Input::Live(live, _) = input else {
+            panic!("not live")
+        };
+        let mut live = live.promote(get_codec_registry(), get_probe()).unwrap();
+        tokio::task::spawn_blocking(move || {
+            let parsed = live.parsed_mut().unwrap();
+            for _ in 0..50 {
+                parsed.format.next_packet().expect("packet");
+            }
+        })
+        .await
+        .unwrap();
+        start.elapsed()
+    }
+
+    let url = "https://www.youtube.com/watch?v=kPa7bsKwL-c";
+    let lookup = Instant::now();
+    let src = lyra::http::lookup(reqwest::Client::new(), url)
+        .await
+        .expect("lookup");
+    println!("lookup: {:?}", lookup.elapsed());
+    println!(
+        "first play, to 50 packets: {:?}",
+        first_packet(src.clone()).await
+    );
+
+    for _ in 0..300 {
+        if cached.exists() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(cached.exists(), "downloaded into the cache");
+    println!("cached play, to 50 packets: {:?}", first_packet(src).await);
+    let _ = std::fs::remove_dir_all(&dir);
+}

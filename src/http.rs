@@ -160,7 +160,14 @@ async fn get_with_retry(
     first: Resolved,
     refresh: impl Future<Output = Result<Resolved, AudioStreamError>>,
 ) -> Result<(Resolved, reqwest::Response), AudioStreamError> {
-    let send = |resolved: &Resolved| client.get(&resolved.url).headers(headers(resolved)).send();
+    let send = |resolved: &Resolved| {
+        let mut req = client.get(&resolved.url).headers(headers(resolved));
+        // YouTube throttles open-ended requests to about real time; a range is fast.
+        if let Some(len) = resolved.filesize.filter(|len| *len > 0) {
+            req = req.header(reqwest::header::RANGE, format!("bytes=0-{}", len - 1));
+        }
+        req.send()
+    };
     let mut resolved = first;
     let mut resp = send(&resolved).await.map_err(fail)?;
     if resp.status() == StatusCode::FORBIDDEN {
@@ -481,6 +488,26 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.bytes().await.unwrap().as_ref(), b"ok");
+    }
+
+    #[tokio::test]
+    async fn known_size_is_requested_as_a_range() {
+        // YouTube throttles open-ended requests to about real time; ranged ones are fast.
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(wiremock::matchers::header("range", "bytes=0-9"))
+            .respond_with(ResponseTemplate::new(206).set_body_bytes(vec![1u8; 10]))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let mut first = resolved(server.uri());
+        first.filesize = Some(10);
+        let refresh = first.clone();
+
+        let (_, resp) = get_with_retry(&reqwest::Client::new(), first, async { Ok(refresh) })
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), 206);
     }
 
     #[tokio::test]
