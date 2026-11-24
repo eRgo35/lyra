@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
 
+pub mod audio_cache;
 pub mod commands;
 pub mod http;
 pub mod reminders;
@@ -25,6 +26,8 @@ pub type Context<'a> = poise::Context<'a, Data, Error>;
 /// (a volume in Docker, `/var/lib/lyra` under systemd).
 pub const SOUNDBOARD_DIR: &str = "data/soundboard";
 pub const REMINDERS_FILE: &str = "data/reminders.json";
+/// Where played tracks are cached (`AUDIO_CACHE_SIZE`).
+pub const AUDIO_CACHE_DIR: &str = "data/audio-cache";
 
 pub struct Data {
     /// For lookups (`weather`, `whois`, ...).
