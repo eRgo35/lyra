@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Tracks start much sooner: each new track runs yt-dlp once instead of three
+  times, and its stream URL from the reply's lookup is reused when it starts.
+- The wait for YouTube to serve a new stream is now off by default
+  (`WAIT_FOR_STREAM=true` turns it back on). If YouTube refuses a stream, Lyra
+  waits until it is available and retries once.
+
+### Added
+
+- An on-disk cache of played tracks (`AUDIO_CACHE_SIZE`, default `512M`, in
+  `data/audio-cache`). Tracks play while they download; replays, loops and
+  repeat-all start at once with no YouTube traffic. The least recently played
+  are removed when it is full.
+
 ## [0.19.0] - 2026-11-22
 
 ### Fixed
