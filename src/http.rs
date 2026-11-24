@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::LazyLock;
+use std::future::Future;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use poise::serenity_prelude::{async_trait, prelude::TypeMapKey};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-use reqwest::Client as HttpClient;
+use reqwest::{Client as HttpClient, StatusCode};
 use serde::Deserialize;
 use songbird::input::metadata::YoutubeDlOutput;
 use songbird::input::{
@@ -13,6 +14,9 @@ use songbird::input::{
 };
 use symphonia::core::io::MediaSource;
 use tokio::process::Command;
+use tracing::warn;
+
+use crate::audio_cache::{video_id, AudioCache};
 
 /// The client music sources stream through (see [`media_client`]).
 pub struct HttpKey;
@@ -127,6 +131,53 @@ fn url_fresh(url: &str, now: SystemTime) -> bool {
     Duration::from_secs(expire) > now + MIN_URL_LIFE
 }
 
+fn headers(resolved: &Resolved) -> HeaderMap {
+    resolved
+        .http_headers
+        .iter()
+        .filter_map(|(k, v)| {
+            Some((
+                HeaderName::from_bytes(k.as_bytes()).ok()?,
+                HeaderValue::from_str(v).ok()?,
+            ))
+        })
+        .collect()
+}
+
+fn http_request(client: &HttpClient, resolved: &Resolved) -> HttpRequest {
+    HttpRequest {
+        client: client.clone(),
+        request: resolved.url.clone(),
+        headers: headers(resolved),
+        content_length: resolved.filesize,
+    }
+}
+
+/// GETs the stream. On 403 (the URL is not served yet), waits for `available_at` of
+/// the info `refresh` gives and tries once more.
+async fn get_with_retry(
+    client: &HttpClient,
+    first: Resolved,
+    refresh: impl Future<Output = Result<Resolved, AudioStreamError>>,
+) -> Result<(Resolved, reqwest::Response), AudioStreamError> {
+    let send = |resolved: &Resolved| client.get(&resolved.url).headers(headers(resolved)).send();
+    let mut resolved = first;
+    let mut resp = send(&resolved).await.map_err(fail)?;
+    if resp.status() == StatusCode::FORBIDDEN {
+        warn!("Stream refused (403), retrying once");
+        resolved = refresh.await?;
+        tokio::time::sleep(wait_for(resolved.available_at, SystemTime::now())).await;
+        resp = send(&resolved).await.map_err(fail)?;
+    }
+    if !resp.status().is_success() {
+        return Err(fail(format!(
+            "failed with http status code: {}",
+            resp.status()
+        )));
+    }
+    Ok((resolved, resp))
+}
+
 /// Metadata and stream info from one line of `yt-dlp -j` output.
 fn parse_line(line: &str) -> Result<(AuxMetadata, Resolved), AudioStreamError> {
     let read = |e| fail(format!("could not read yt-dlp output: {e}"));
@@ -202,6 +253,77 @@ impl Ytdl {
         parse_line(line)
     }
 
+    /// Starts the stream: from `cache` when the video is there (or downloading),
+    /// otherwise from YouTube, downloading into `cache` while it plays.
+    async fn start(
+        &mut self,
+        cache: Option<Arc<AudioCache>>,
+    ) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
+        let id = self
+            .known
+            .as_ref()
+            .and_then(|m| m.source_url.as_deref())
+            .and_then(video_id)
+            .or_else(|| video_id(&self.query));
+        let cache = cache.zip(id);
+        if let Some((cache, id)) = &cache {
+            if let Some(input) = cache.get(id) {
+                return Ok(AudioStream { input });
+            }
+        }
+
+        let carried = self
+            .carried
+            .as_ref()
+            .is_some_and(|c| url_fresh(&c.url, SystemTime::now()));
+        let resolved = self.stream_info().await?;
+        if *WAIT_FOR_STREAM {
+            tokio::time::sleep(wait_for(resolved.available_at, SystemTime::now())).await;
+        }
+
+        if resolved.protocol.as_deref() == Some("m3u8_native") {
+            let headers = headers(&resolved);
+            return HlsRequest::new_with_headers(self.client.clone(), resolved.url, headers)
+                .create();
+        }
+
+        // A refused kept URL is replaced by a fresh one; a fresh one is retried as is.
+        let this = &*self;
+        let refresh = |resolved: &Resolved| {
+            let resolved = resolved.clone();
+            async move {
+                if carried {
+                    Ok(this.resolve().await?.1)
+                } else {
+                    Ok(resolved)
+                }
+            }
+        };
+
+        let Some((cache, id)) = cache else {
+            return match http_request(&self.client, &resolved).create_async().await {
+                Ok(stream) => Ok(stream),
+                Err(e) => {
+                    warn!("Stream fetch failed, retrying once: {e}");
+                    let next = refresh(&resolved).await?;
+                    tokio::time::sleep(wait_for(next.available_at, SystemTime::now())).await;
+                    http_request(&self.client, &next).create_async().await
+                }
+            };
+        };
+
+        let (resolved, resp) =
+            get_with_retry(&self.client, resolved.clone(), refresh(&resolved)).await?;
+        let ext = resolved
+            .ext
+            .filter(|e| !e.is_empty() && e.bytes().all(|b| b.is_ascii_alphanumeric()))
+            .unwrap_or_else(|| "bin".to_string());
+        let input = cache
+            .download(&id, &ext, resp)
+            .map_err(|e| fail(format!("could not cache the stream: {e}")))?;
+        Ok(AudioStream { input })
+    }
+
     /// The kept stream info if it is still fresh, otherwise a new yt-dlp run.
     async fn stream_info(&mut self) -> Result<Resolved, AudioStreamError> {
         match self.carried.take() {
@@ -220,34 +342,7 @@ impl Compose for Ytdl {
     async fn create_async(
         &mut self,
     ) -> Result<AudioStream<Box<dyn MediaSource>>, AudioStreamError> {
-        let resolved = self.stream_info().await?;
-        if *WAIT_FOR_STREAM {
-            tokio::time::sleep(wait_for(resolved.available_at, SystemTime::now())).await;
-        }
-
-        let headers = resolved
-            .http_headers
-            .iter()
-            .filter_map(|(k, v)| {
-                Some((
-                    HeaderName::from_bytes(k.as_bytes()).ok()?,
-                    HeaderValue::from_str(v).ok()?,
-                ))
-            })
-            .collect::<HeaderMap>();
-
-        if resolved.protocol.as_deref() == Some("m3u8_native") {
-            HlsRequest::new_with_headers(self.client.clone(), resolved.url, headers).create()
-        } else {
-            HttpRequest {
-                client: self.client.clone(),
-                request: resolved.url,
-                headers,
-                content_length: resolved.filesize,
-            }
-            .create_async()
-            .await
-        }
+        self.start(crate::audio_cache::global()).await
     }
 
     fn should_create_async(&self) -> bool {
@@ -273,9 +368,137 @@ impl From<Ytdl> for Input {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_line, proxy_args, url_fresh, wait_enabled, wait_for, ytdl, MAX_WAIT};
+    use super::{
+        get_with_retry, parse_line, proxy_args, url_fresh, wait_enabled, wait_for, ytdl, Resolved,
+        Ytdl, MAX_WAIT,
+    };
+    use crate::audio_cache::AudioCache;
     use songbird::input::{AuxMetadata, Compose};
-    use std::time::{Duration, UNIX_EPOCH};
+    use std::io::Read;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const SOURCE: &str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
+    fn resolved(url: String) -> Resolved {
+        Resolved {
+            url,
+            http_headers: Default::default(),
+            filesize: None,
+            protocol: Some("https".into()),
+            ext: Some("webm".into()),
+            available_at: None,
+        }
+    }
+
+    /// A looked-up source whose kept stream URL points at `server`.
+    fn looked_up(server: &MockServer) -> Ytdl {
+        let mut src = ytdl(reqwest::Client::new(), SOURCE).with_metadata(AuxMetadata {
+            source_url: Some(SOURCE.into()),
+            ..AuxMetadata::default()
+        });
+        src.carried = Some(resolved(format!("{}/s?expire=99999999999", server.uri())));
+        src
+    }
+
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "lyra-http-test-{name}-{}-{:?}",
+            std::process::id(),
+            SystemTime::now()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    async fn read_stream(mut src: Ytdl, cache: std::sync::Arc<AudioCache>) -> Vec<u8> {
+        let mut stream = src.start(Some(cache)).await.unwrap();
+        tokio::task::spawn_blocking(move || {
+            let mut out = Vec::new();
+            stream.input.read_to_end(&mut out).unwrap();
+            out
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn cached_track_starts_without_network() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+        let dir = temp_dir("cached");
+        std::fs::write(dir.join("dQw4w9WgXcQ.webm"), b"cached audio").unwrap();
+        let cache = AudioCache::open(&dir, 1 << 20).unwrap();
+
+        assert_eq!(
+            read_stream(looked_up(&server), cache).await,
+            b"cached audio"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn second_start_attaches_to_running_download() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![7u8; 256 * 1024]))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let cache = AudioCache::open(temp_dir("attach"), 1 << 20).unwrap();
+        let src = looked_up(&server);
+
+        let mut second = src.clone();
+        let first = read_stream(src, cache.clone());
+        let second_stream = second.start(Some(cache.clone())).await;
+        assert!(second_stream.is_ok());
+        assert_eq!(first.await.len(), 256 * 1024);
+    }
+
+    #[tokio::test]
+    async fn refused_url_is_retried_once() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(403))
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"ok".to_vec()))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let first = resolved(server.uri());
+        let refresh = first.clone();
+
+        let (_, resp) = get_with_retry(&client, first, async { Ok(refresh) })
+            .await
+            .unwrap();
+        assert_eq!(resp.bytes().await.unwrap().as_ref(), b"ok");
+    }
+
+    #[tokio::test]
+    async fn refused_twice_fails() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(403))
+            .expect(2)
+            .mount(&server)
+            .await;
+        let client = reqwest::Client::new();
+        let first = resolved(server.uri());
+        let refresh = first.clone();
+
+        assert!(get_with_retry(&client, first, async { Ok(refresh) })
+            .await
+            .is_err());
+    }
 
     #[test]
     fn resolve_json_yields_metadata_and_stream() {
