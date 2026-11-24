@@ -71,7 +71,19 @@ impl Enqueuer {
         query: String,
         metadata: AuxMetadata,
     ) -> TrackHandle {
-        let src = crate::http::ytdl(self.http_client.clone(), query);
+        let src =
+            crate::http::ytdl(self.http_client.clone(), query).with_metadata(metadata.clone());
+        self.enqueue_source(call, src, metadata).await
+    }
+
+    /// Enqueues `src` (e.g. from [`crate::http::lookup`], keeping its stream URL), as
+    /// [`Self::enqueue`] does.
+    pub async fn enqueue_source(
+        &self,
+        call: &mut Call,
+        src: crate::http::Ytdl,
+        metadata: AuxMetadata,
+    ) -> TrackHandle {
         let handle = call
             .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())))
             .await;

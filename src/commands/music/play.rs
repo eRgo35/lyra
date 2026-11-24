@@ -5,13 +5,13 @@ use crate::{
     Context, Error,
 };
 
+use crate::http::Ytdl;
 use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
 use poise::CreateReply;
 use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
-use songbird::input::Compose;
 use songbird::tracks::TrackQueue;
 use songbird::Call;
 use spotify_parser;
@@ -132,10 +132,12 @@ async fn handle_play<'a>(
         results.clear();
     }
 
-    let aux_metadata = match first.metadata {
-        Some(metadata) => metadata,
-        None => match lookup_metadata(enqueuer, first.query.clone()).await {
-            Ok(metadata) => metadata,
+    let src = match first.metadata {
+        Some(metadata) => {
+            crate::http::ytdl(enqueuer.http_client.clone(), first.query).with_metadata(metadata)
+        }
+        None => match lookup_source(enqueuer, first.query).await {
+            Ok(src) => src,
             Err(e) => {
                 warn!("Failed to load track metadata: {e}");
                 let msg = with_detail("Could not load that track!", &e);
@@ -146,6 +148,7 @@ async fn handle_play<'a>(
         },
     };
 
+    let aux_metadata = src.metadata().cloned().unwrap_or_default();
     ctx.send(
         CreateReply::default().embed(
             generate_embed(
@@ -161,7 +164,7 @@ async fn handle_play<'a>(
     .await?;
 
     enqueuer
-        .enqueue(&mut handler, first.query, aux_metadata)
+        .enqueue_source(&mut handler, src, aux_metadata)
         .await;
 
     if force && handler.queue().len() > 1 {
@@ -299,13 +302,12 @@ fn playlist_entries(output: &str) -> Vec<Entry> {
 /// How many yt-dlp metadata lookups run at once for entries without known metadata.
 const METADATA_LOOKUPS: usize = 4;
 
-async fn lookup_metadata(
+/// The source for `query` with its metadata, from one yt-dlp run.
+async fn lookup_source(
     enqueuer: &Enqueuer,
     query: String,
-) -> Result<AuxMetadata, songbird::input::AudioStreamError> {
-    crate::http::ytdl(enqueuer.http_client.clone(), query)
-        .aux_metadata()
-        .await
+) -> Result<Ytdl, songbird::input::AudioStreamError> {
+    crate::http::lookup(enqueuer.http_client.clone(), query).await
 }
 
 async fn handle_playlist(playlist: VecDeque<Entry>, enqueuer: &Enqueuer) -> Result<(), Error> {
@@ -318,22 +320,26 @@ async fn handle_playlist(playlist: VecDeque<Entry>, enqueuer: &Enqueuer) -> Resu
             let lookups = lookups.clone();
             let enqueuer = enqueuer.clone();
             tokio::spawn(async move {
-                let metadata = match entry.metadata {
-                    Some(metadata) => Ok(metadata),
+                let src = match entry.metadata {
+                    Some(metadata) => Ok(crate::http::ytdl(
+                        enqueuer.http_client.clone(),
+                        entry.query.clone(),
+                    )
+                    .with_metadata(metadata)),
                     None => {
                         let _permit = lookups.acquire().await;
-                        lookup_metadata(&enqueuer, entry.query.clone()).await
+                        lookup_source(&enqueuer, entry.query.clone()).await
                     }
                 };
-                (entry.query, metadata)
+                (entry.query, src)
             })
         })
         .collect::<Vec<_>>();
 
     for lookup in pending {
-        let (query, metadata) = lookup.await?;
-        let metadata = match metadata {
-            Ok(metadata) => metadata,
+        let (query, src) = lookup.await?;
+        let src = match src {
+            Ok(src) => src,
             Err(e) => {
                 warn!("Skipping playlist entry {query}: {e}");
                 continue;
@@ -344,8 +350,9 @@ async fn handle_playlist(playlist: VecDeque<Entry>, enqueuer: &Enqueuer) -> Resu
         let Some(handler) = enqueuer.manager.get(enqueuer.guild_id) else {
             break;
         };
+        let metadata = src.metadata().cloned().unwrap_or_default();
         enqueuer
-            .enqueue(&mut *handler.lock().await, query, metadata)
+            .enqueue_source(&mut *handler.lock().await, src, metadata)
             .await;
     }
 

@@ -1,11 +1,13 @@
-use crate::{commands::embeds::error_embed, Context, Error};
+use crate::{
+    commands::embeds::{error_embed, with_detail},
+    Context, Error,
+};
 
 use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
 use poise::CreateReply;
 use songbird::input::AuxMetadata;
-use songbird::input::Compose;
 use std::time::Duration;
 
 use crate::http::HttpKey;
@@ -60,12 +62,21 @@ pub async fn stream(
             song = format!("ytsearch:{}", song);
         }
 
-        let src = crate::http::ytdl(http_client, song);
-        let embed = generate_embed(ctx, src.clone()).await;
+        let src = match crate::http::lookup(http_client, song).await {
+            Ok(src) => src,
+            Err(e) => {
+                let msg = with_detail("Could not load that track!", &e);
+                ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
+                    .await?;
+                return Ok(());
+            }
+        };
+        let metadata = src.metadata().cloned().unwrap_or_default();
+        let embed = generate_embed(ctx, metadata).await;
         let response = CreateReply::default().embed(embed.unwrap());
         ctx.send(response).await?;
 
-        let _ = handler.play_input(src.clone().into());
+        let _ = handler.play_input(src.into());
     } else {
         let msg = "I am not in a voice channel!";
         ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
@@ -75,8 +86,7 @@ pub async fn stream(
     Ok(())
 }
 
-async fn generate_embed(ctx: Context<'_>, src: crate::http::Ytdl) -> Result<CreateEmbed, Error> {
-    let metadata = src.clone().aux_metadata().await.unwrap();
+async fn generate_embed(ctx: Context<'_>, metadata: AuxMetadata) -> Result<CreateEmbed, Error> {
     let AuxMetadata {
         title,
         thumbnail,
