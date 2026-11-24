@@ -71,7 +71,8 @@ impl Enqueuer {
         query: String,
         metadata: AuxMetadata,
     ) -> TrackHandle {
-        let src = crate::http::ytdl(self.http_client.clone(), query);
+        let src =
+            crate::http::ytdl(self.http_client.clone(), query).with_metadata(metadata.clone());
         let handle = call
             .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())))
             .await;
