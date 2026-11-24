@@ -159,22 +159,30 @@ async fn get_with_retry(
     client: &HttpClient,
     first: Resolved,
     refresh: impl Future<Output = Result<Resolved, AudioStreamError>>,
-) -> Result<(Resolved, reqwest::Response), AudioStreamError> {
-    let send = |resolved: &Resolved| {
+) -> Result<(Resolved, reqwest::Request, reqwest::Response), AudioStreamError> {
+    let build = |resolved: &Resolved| {
         let mut req = client.get(&resolved.url).headers(headers(resolved));
         // YouTube throttles open-ended requests to about real time; a range is fast.
         if let Some(len) = resolved.filesize.filter(|len| *len > 0) {
             req = req.header(reqwest::header::RANGE, format!("bytes=0-{}", len - 1));
         }
-        req.send()
+        req.build().map_err(fail)
+    };
+    let send = |req: &reqwest::Request| {
+        let req = req
+            .try_clone()
+            .expect("GET requests have no streaming body");
+        client.execute(req)
     };
     let mut resolved = first;
-    let mut resp = send(&resolved).await.map_err(fail)?;
+    let mut req = build(&resolved)?;
+    let mut resp = send(&req).await.map_err(fail)?;
     if resp.status() == StatusCode::FORBIDDEN {
         warn!("Stream refused (403), retrying once");
         resolved = refresh.await?;
         tokio::time::sleep(wait_for(resolved.available_at, SystemTime::now())).await;
-        resp = send(&resolved).await.map_err(fail)?;
+        req = build(&resolved)?;
+        resp = send(&req).await.map_err(fail)?;
     }
     if !resp.status().is_success() {
         return Err(fail(format!(
@@ -182,7 +190,7 @@ async fn get_with_retry(
             resp.status()
         )));
     }
-    Ok((resolved, resp))
+    Ok((resolved, req, resp))
 }
 
 /// Metadata and stream info from one line of `yt-dlp -j` output.
@@ -319,16 +327,21 @@ impl Ytdl {
             };
         };
 
-        let (resolved, resp) =
+        let (resolved, request, resp) =
             get_with_retry(&self.client, resolved.clone(), refresh(&resolved)).await?;
         let ext = resolved
             .ext
+            .clone()
             .filter(|e| !e.is_empty() && e.bytes().all(|b| b.is_ascii_alphanumeric()))
             .unwrap_or_else(|| "bin".to_string());
-        let input = cache
-            .download(&id, &ext, resp)
-            .map_err(|e| fail(format!("could not cache the stream: {e}")))?;
-        Ok(AudioStream { input })
+        match cache.download(&id, &ext, self.client.clone(), request, resp) {
+            Ok(input) => Ok(AudioStream { input }),
+            Err(e) => {
+                // E.g. a full disk: play without caching rather than not at all.
+                warn!("Could not cache {id}, streaming instead: {e}");
+                http_request(&self.client, &resolved).create_async().await
+            }
+        }
     }
 
     /// The kept stream info if it is still fresh, otherwise a new yt-dlp run.
@@ -484,10 +497,25 @@ mod tests {
         let first = resolved(server.uri());
         let refresh = first.clone();
 
-        let (_, resp) = get_with_retry(&client, first, async { Ok(refresh) })
+        let (_, _, resp) = get_with_retry(&client, first, async { Ok(refresh) })
             .await
             .unwrap();
         assert_eq!(resp.bytes().await.unwrap().as_ref(), b"ok");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unwritable_cache_falls_back_to_streaming() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"streamed".to_vec()))
+            .mount(&server)
+            .await;
+        let dir = temp_dir("unwritable");
+        let cache = AudioCache::open(&dir, 1 << 20).unwrap();
+        // Like a full disk: the cache can no longer create files.
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(read_stream(looked_up(&server), cache).await, b"streamed");
     }
 
     #[tokio::test]
@@ -504,7 +532,7 @@ mod tests {
         first.filesize = Some(10);
         let refresh = first.clone();
 
-        let (_, resp) = get_with_retry(&reqwest::Client::new(), first, async { Ok(refresh) })
+        let (_, _, resp) = get_with_retry(&reqwest::Client::new(), first, async { Ok(refresh) })
             .await
             .unwrap();
         assert_eq!(resp.status(), 206);

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, LazyLock, Mutex};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use symphonia::core::io::MediaSource;
 use tokio::io::AsyncWriteExt;
@@ -90,6 +90,8 @@ pub fn global() -> Option<Arc<AudioCache>> {
 pub struct AudioCache {
     dir: PathBuf,
     limit: u64,
+    /// A download that receives nothing for this long is treated as dropped.
+    stall: Duration,
     state: Mutex<State>,
 }
 
@@ -130,6 +132,10 @@ impl Download {
 impl AudioCache {
     /// Opens (creating) `dir`, deleting unfinished downloads and indexing the rest.
     pub fn open(dir: impl AsRef<Path>, limit: u64) -> io::Result<Arc<Self>> {
+        Self::open_with(dir, limit, STALL_TIMEOUT)
+    }
+
+    fn open_with(dir: impl AsRef<Path>, limit: u64, stall: Duration) -> io::Result<Arc<Self>> {
         let dir = dir.as_ref().to_path_buf();
         std::fs::create_dir_all(&dir)?;
         let mut state = State::default();
@@ -160,6 +166,7 @@ impl AudioCache {
         let cache = Arc::new(AudioCache {
             dir,
             limit,
+            stall,
             state: Mutex::new(state),
         });
         cache.evict(&mut cache.state.lock().unwrap());
@@ -168,7 +175,10 @@ impl AudioCache {
 
     /// The audio for `id`: the cached file, or the file still being downloaded.
     pub fn get(&self, id: &str) -> Option<Box<dyn MediaSource>> {
-        let mut state = self.state.lock().unwrap();
+        Self::existing(&mut self.state.lock().unwrap(), id)
+    }
+
+    fn existing(state: &mut State, id: &str) -> Option<Box<dyn MediaSource>> {
         if let Some(cached) = state.files.get_mut(id) {
             match std::fs::File::open(&cached.path) {
                 Ok(file) => {
@@ -193,14 +203,22 @@ impl AudioCache {
             .map(|f| Box::new(f) as Box<dyn MediaSource>)
     }
 
-    /// Downloads `resp` into the cache as `id`, returning a reader that plays it while
-    /// it downloads. The download goes on if the reader is dropped.
+    /// Downloads `resp` (the answer to `request`) into the cache as `id`, returning a
+    /// reader that plays it while it downloads. The download goes on if the reader is
+    /// dropped, and resumes with a range of `request` if the connection drops. If `id`
+    /// was cached or started meanwhile, `resp` is dropped and that is returned instead.
     pub fn download(
         self: &Arc<Self>,
         id: &str,
         ext: &str,
+        client: reqwest::Client,
+        request: reqwest::Request,
         resp: reqwest::Response,
     ) -> io::Result<Box<dyn MediaSource>> {
+        let mut state = self.state.lock().unwrap();
+        if let Some(existing) = Self::existing(&mut state, id) {
+            return Ok(existing);
+        }
         let part = self.dir.join(format!("{id}.{ext}.part"));
         let file = std::fs::File::create(&part)?;
         let download = Arc::new(Download {
@@ -210,25 +228,35 @@ impl AudioCache {
             changed: Condvar::new(),
         });
         let reader = GrowingFile::open(download.clone())?;
-        self.state
-            .lock()
-            .unwrap()
-            .downloads
-            .insert(id.to_string(), download.clone());
+        state.downloads.insert(id.to_string(), download.clone());
+        drop(state);
 
         let cache = self.clone();
         let id = id.to_string();
         let path = self.dir.join(format!("{id}.{ext}"));
         tokio::spawn(async move {
-            let result = write_body(resp, tokio::fs::File::from_std(file), &download).await;
+            let body = Body {
+                client,
+                request,
+                stall: cache.stall,
+            };
+            let result = body
+                .write(resp, tokio::fs::File::from_std(file), &download)
+                .await;
             cache.finish(&id, &path, &download, result);
         });
         Ok(Box::new(reader))
     }
 
-    fn finish(&self, id: &str, path: &Path, download: &Download, result: Result<(), String>) {
+    fn finish(&self, id: &str, path: &Path, download: &Arc<Download>, result: Result<(), String>) {
         let mut state = self.state.lock().unwrap();
-        state.downloads.remove(id);
+        if state
+            .downloads
+            .get(id)
+            .is_some_and(|d| Arc::ptr_eq(d, download))
+        {
+            state.downloads.remove(id);
+        }
         let size = download.progress.lock().unwrap().written;
         let result = result.and_then(|()| {
             if size > self.limit {
@@ -275,21 +303,76 @@ impl AudioCache {
     }
 }
 
-async fn write_body(
-    mut resp: reqwest::Response,
-    mut file: tokio::fs::File,
-    download: &Download,
-) -> Result<(), String> {
-    while let Some(chunk) = resp.chunk().await.map_err(|e| e.to_string())? {
-        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
-        // Readers use their own handle, so the bytes must reach the file first.
-        file.flush().await.map_err(|e| e.to_string())?;
-        download.update(|p| p.written += chunk.len() as u64);
+/// How long a download may receive nothing before it is resumed (or failed).
+const STALL_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// How many times a dropped or stalled download is resumed before it fails.
+const RESUMES: usize = 3;
+
+/// What a download needs to resume where it stopped.
+struct Body {
+    client: reqwest::Client,
+    request: reqwest::Request,
+    stall: Duration,
+}
+
+impl Body {
+    async fn write(
+        &self,
+        mut resp: reqwest::Response,
+        mut file: tokio::fs::File,
+        download: &Download,
+    ) -> Result<(), String> {
+        let mut resumes = 0;
+        loop {
+            let interrupted = loop {
+                let chunk = match tokio::time::timeout(self.stall, resp.chunk()).await {
+                    Err(_) => break format!("nothing received for {:?}", self.stall),
+                    Ok(Err(e)) => break e.to_string(),
+                    Ok(Ok(chunk)) => chunk,
+                };
+                let Some(chunk) = chunk else {
+                    let written = download.progress.lock().unwrap().written;
+                    match download.len {
+                        Some(len) if written < len => {
+                            break format!("ended after {written} of {len} bytes")
+                        }
+                        _ => return Ok(()),
+                    }
+                };
+                file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+                // Readers use their own handle, so the bytes must reach the file first.
+                file.flush().await.map_err(|e| e.to_string())?;
+                download.update(|p| p.written += chunk.len() as u64);
+            };
+            resp = loop {
+                if resumes == RESUMES {
+                    return Err(interrupted);
+                }
+                resumes += 1;
+                warn!("Download interrupted ({interrupted}); resuming");
+                if let Some(resp) = self.resume(download).await {
+                    break resp;
+                }
+            };
+        }
     }
-    let written = download.progress.lock().unwrap().written;
-    match download.len {
-        Some(len) if written < len => Err(format!("ended after {written} of {len} bytes")),
-        _ => Ok(()),
+
+    /// The rest of the body, from the bytes written so far.
+    async fn resume(&self, download: &Download) -> Option<reqwest::Response> {
+        let written = download.progress.lock().unwrap().written;
+        let end = download
+            .len
+            .map(|len| (len - 1).to_string())
+            .unwrap_or_default();
+        let mut request = self.request.try_clone()?;
+        let range = format!("bytes={written}-{end}").parse().ok()?;
+        request.headers_mut().insert(reqwest::header::RANGE, range);
+        let resp = tokio::time::timeout(self.stall, self.client.execute(request))
+            .await
+            .ok()?
+            .ok()?;
+        (resp.status() == reqwest::StatusCode::PARTIAL_CONTENT).then_some(resp)
     }
 }
 
@@ -402,14 +485,73 @@ mod tests {
         (0..len).map(|i| (i % 251) as u8).collect()
     }
 
-    async fn serve(bytes: Vec<u8>) -> (MockServer, reqwest::Response) {
+    /// A response from `url`, with the client and request a download resumes with.
+    struct Fetched {
+        client: reqwest::Client,
+        request: reqwest::Request,
+        resp: reqwest::Response,
+    }
+
+    async fn fetch(url: &str) -> Fetched {
+        let client = reqwest::Client::new();
+        let request = client.get(url).build().unwrap();
+        let resp = client.execute(request.try_clone().unwrap()).await.unwrap();
+        Fetched {
+            client,
+            request,
+            resp,
+        }
+    }
+
+    fn download(cache: &Arc<AudioCache>, f: Fetched) -> Box<dyn MediaSource> {
+        cache
+            .download(ID, "webm", f.client, f.request, f.resp)
+            .unwrap()
+    }
+
+    async fn serve(bytes: Vec<u8>) -> (MockServer, Fetched) {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes))
             .mount(&server)
             .await;
-        let resp = reqwest::get(server.uri()).await.unwrap();
-        (server, resp)
+        let fetched = fetch(&server.uri()).await;
+        (server, fetched)
+    }
+
+    /// A raw HTTP server: connection `n` gets `respond(n, request)` written in parts,
+    /// waiting `pause` between them, then is held open for `hold`.
+    async fn raw_server(
+        respond: impl Fn(usize, &str) -> Vec<Vec<u8>> + Send + Sync + 'static,
+        pause: Duration,
+        hold: Duration,
+    ) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let respond = Arc::new(respond);
+        tokio::spawn(async move {
+            let mut n = 0;
+            while let Ok((mut sock, _)) = listener.accept().await {
+                let respond = respond.clone();
+                n += 1;
+                let conn = n;
+                tokio::spawn(async move {
+                    let mut req = [0u8; 4096];
+                    let len = tokio::io::AsyncReadExt::read(&mut sock, &mut req)
+                        .await
+                        .unwrap_or(0);
+                    let req = String::from_utf8_lossy(&req[..len]).to_lowercase();
+                    for part in respond(conn, &req) {
+                        if sock.write_all(&part).await.is_err() {
+                            return;
+                        }
+                        tokio::time::sleep(pause).await;
+                    }
+                    tokio::time::sleep(hold).await;
+                });
+            }
+        });
+        format!("http://{addr}/")
     }
 
     async fn read_all(mut src: Box<dyn MediaSource>) -> std::io::Result<Vec<u8>> {
@@ -462,9 +604,9 @@ mod tests {
         let dir = temp_dir("serve");
         let cache = AudioCache::open(&dir, 1 << 20).unwrap();
         let expected = body(64 * 1024);
-        let (_server, resp) = serve(expected.clone()).await;
+        let (_server, fetched) = serve(expected.clone()).await;
 
-        let src = cache.download(ID, "webm", resp).unwrap();
+        let src = download(&cache, fetched);
         assert_eq!(read_all(src).await.unwrap(), expected);
 
         wait_until(|| dir.join(format!("{ID}.webm")).exists()).await;
@@ -476,9 +618,9 @@ mod tests {
     async fn download_completes_after_reader_dropped() {
         let dir = temp_dir("dropped");
         let cache = AudioCache::open(&dir, 1 << 20).unwrap();
-        let (_server, resp) = serve(body(32 * 1024)).await;
+        let (_server, fetched) = serve(body(32 * 1024)).await;
 
-        let mut src = cache.download(ID, "webm", resp).unwrap();
+        let mut src = download(&cache, fetched);
         tokio::task::spawn_blocking(move || {
             let mut one = [0u8; 1];
             src.read_exact(&mut one).unwrap();
@@ -506,9 +648,9 @@ mod tests {
                 .await
                 .unwrap();
         });
-        let resp = reqwest::get(format!("http://{addr}/")).await.unwrap();
+        let fetched = fetch(&format!("http://{addr}/")).await;
 
-        let src = cache.download(ID, "webm", resp).unwrap();
+        let src = download(&cache, fetched);
         assert!(read_all(src).await.is_err());
 
         wait_until(|| !dir.join(format!("{ID}.webm.part")).exists()).await;
@@ -543,10 +685,8 @@ mod tests {
                 .unwrap();
         }
         let cache = AudioCache::open(&dir, 300).unwrap();
-        let (_server, resp) = serve(body(100)).await;
-        read_all(cache.download(ID, "webm", resp).unwrap())
-            .await
-            .unwrap();
+        let (_server, fetched) = serve(body(100)).await;
+        read_all(download(&cache, fetched)).await.unwrap();
 
         wait_until(|| dir.join(format!("{ID}.webm")).exists()).await;
         wait_until(|| !dir.join("aaaaaaaaaaa.webm").exists()).await;
@@ -561,14 +701,92 @@ mod tests {
         std::fs::write(dir.join("aaaaaaaaaaa.webm"), b"small").unwrap();
         let cache: Arc<AudioCache> = AudioCache::open(&dir, 10).unwrap();
         let expected = body(100);
-        let (_server, resp) = serve(expected.clone()).await;
+        let (_server, fetched) = serve(expected.clone()).await;
 
-        let src = cache.download(ID, "webm", resp).unwrap();
+        let src = download(&cache, fetched);
         assert_eq!(read_all(src).await.unwrap(), expected);
 
         wait_until(|| !dir.join(format!("{ID}.webm.part")).exists()).await;
         assert!(!dir.join(format!("{ID}.webm")).exists());
         assert!(cache.get(ID).is_none());
         assert!(dir.join("aaaaaaaaaaa.webm").exists(), "others not evicted");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn second_download_of_a_video_attaches_to_the_first() {
+        let dir = temp_dir("twice");
+        let cache = AudioCache::open(&dir, 1 << 20).unwrap();
+        let expected = body(100);
+        let slow = expected.clone();
+        let url = raw_server(
+            move |_, _| {
+                let mut parts = vec![b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n".to_vec()];
+                parts.extend(slow.chunks(10).map(<[u8]>::to_vec));
+                parts
+            },
+            Duration::from_millis(30),
+            Duration::ZERO,
+        )
+        .await;
+        let first = download(&cache, fetch(&url).await);
+        let (_server, other) = serve(vec![9u8; 50]).await;
+        let second = download(&cache, other);
+
+        assert_eq!(read_all(first).await.unwrap(), expected);
+        assert_eq!(read_all(second).await.unwrap(), expected);
+        wait_until(|| dir.join(format!("{ID}.webm")).exists()).await;
+        assert_eq!(
+            std::fs::read(dir.join(format!("{ID}.webm"))).unwrap(),
+            expected
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn stalled_download_fails_instead_of_hanging() {
+        let dir = temp_dir("stall");
+        let cache = AudioCache::open_with(&dir, 1 << 20, Duration::from_millis(200)).unwrap();
+        // Every connection sends 10 of 100 bytes, then goes quiet.
+        let url = raw_server(
+            |_, _| vec![b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n0123456789".to_vec()],
+            Duration::ZERO,
+            Duration::from_secs(60),
+        )
+        .await;
+        let src = download(&cache, fetch(&url).await);
+
+        let read = tokio::time::timeout(Duration::from_secs(5), read_all(src)).await;
+        assert!(read.expect("read did not hang").is_err());
+        wait_until(|| cache.get(ID).is_none()).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dropped_connection_resumes_from_written_bytes() {
+        let dir = temp_dir("resume");
+        let cache = AudioCache::open(&dir, 1 << 20).unwrap();
+        let expected = body(100);
+        let rest = expected[10..].to_vec();
+        let start = expected[..10].to_vec();
+        let url = raw_server(
+            move |conn, req| match conn {
+                1 => vec![
+                    b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n".to_vec(),
+                    start.clone(),
+                ],
+                _ if req.contains("range: bytes=10-99") => vec![
+                    b"HTTP/1.1 206 Partial Content\r\nContent-Length: 90\r\n\r\n".to_vec(),
+                    rest.clone(),
+                ],
+                _ => vec![
+                    b"HTTP/1.1 416 Range Not Satisfiable\r\nContent-Length: 0\r\n\r\n".to_vec(),
+                ],
+            },
+            Duration::ZERO,
+            Duration::ZERO,
+        )
+        .await;
+        let src = download(&cache, fetch(&url).await);
+
+        assert_eq!(read_all(src).await.unwrap(), expected);
+        wait_until(|| dir.join(format!("{ID}.webm")).exists()).await;
     }
 }
