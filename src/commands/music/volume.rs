@@ -34,14 +34,13 @@ pub async fn volume(ctx: Context<'_>, #[description = "Volume"] volume: f32) -> 
                     "",
                     &format!("Set volume to {}%", volume),
                 )
-                .await
-                .unwrap(),
+                .await?,
             ),
         )
         .await?;
     } else {
         let msg = "I am not in a voice channel!";
-        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
     }
 

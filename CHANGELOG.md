@@ -6,6 +6,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The next track in the queue is downloaded into the audio cache as soon as the
+  current one starts, so there is no gap between tracks even where yt-dlp is
+  slow (songbird only readied it 5 s ahead).
+- Cached tracks and repeated searches are enqueued without running yt-dlp: the
+  cache keeps each track's metadata (`<id>.json`), and search results are
+  remembered while the bot runs.
+- `play`, `forceplay`, `effect` and `stream` no longer hold the voice call's lock
+  while yt-dlp runs, so `skip`, `queue`, `pause` etc. answer at once while a track
+  is loading. `play` joins the channel and resolves the track at the same time.
+- Opus audio is preferred from YouTube, which songbird can send to Discord without
+  decoding and re-encoding (one track at 100% volume): much less CPU.
+- Only the gateway events the bot uses are received (no typing, reactions,
+  invites, ...), and gateway events are no longer logged one by one.
+- Release builds use thin LTO with one codegen unit, and the mimalloc allocator.
+- Playlist lookups without metadata (e.g. Spotify) run one yt-dlp per two CPU
+  cores (1 to 4) instead of always 4.
+- HTTP requests have a connect timeout, and lookups (`weather`, ...) time out
+  after 20 s instead of hanging.
+- `AUDIO_CACHE_SIZE` defaults to `1G` (was `512M`).
+- `queue` shows all tracks, ten per page, with ◀ ▶ buttons.
+- The Docker image keeps yt-dlp's cache in the data volume.
+
+### Added
+
+- `AUTO_LEAVE` (e.g. `10m`): leave the voice channel after that long with an
+  empty queue or nobody listening. Off by default.
+
+### Fixed
+
+- A track that fails to play is now reported in the channel instead of just
+  going silent, and joining again no longer reports each failure twice.
+- A Spotify link that can't be read gives an error reply instead of a panic
+  (`spotify-parser` 1.1.0), and artists of album/playlist tracks are no longer
+  joined with `&nbsp;`, which broke their YouTube search.
+
 ## [0.20.0] - 2026-11-24
 
 ### Changed

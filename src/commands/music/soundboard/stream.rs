@@ -8,6 +8,8 @@ use poise::serenity_prelude::{
 };
 use poise::CreateReply;
 use songbird::input::AuxMetadata;
+use songbird::tracks::Track;
+use std::sync::Arc;
 use std::time::Duration;
 
 use crate::http::HttpKey;
@@ -55,32 +57,38 @@ pub async fn stream(
         }
     }
 
-    if let Some(handler_lock) = manager.get(guild_id) {
-        let mut handler = handler_lock.lock().await;
-
-        if is_query {
-            song = format!("ytsearch:{}", song);
-        }
-
-        let src = match crate::http::lookup(http_client, song).await {
-            Ok(src) => src,
-            Err(e) => {
-                let msg = with_detail("Could not load that track!", &e);
-                ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
-                    .await?;
-                return Ok(());
-            }
-        };
-        let metadata = src.metadata().cloned().unwrap_or_default();
-        let embed = generate_embed(ctx, metadata).await;
-        let response = CreateReply::default().embed(embed.unwrap());
-        ctx.send(response).await?;
-
-        let _ = handler.play_input(src.into());
-    } else {
+    if manager.get(guild_id).is_none() {
         let msg = "I am not in a voice channel!";
-        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
+        return Ok(());
+    }
+
+    if is_query {
+        song = format!("ytsearch:{}", song);
+    }
+
+    // Resolved before locking the call: yt-dlp can take seconds, and other commands
+    // (and songbird itself) need the lock meanwhile.
+    let src = match crate::http::lookup(http_client, song).await {
+        Ok(src) => src,
+        Err(e) => {
+            let msg = with_detail("Could not load that track!", &e);
+            ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
+                .await?;
+            return Ok(());
+        }
+    };
+    let metadata = src.metadata().cloned().unwrap_or_default();
+    ctx.send(CreateReply::default().embed(generate_embed(ctx, metadata.clone()).await?))
+        .await?;
+
+    // The bot may have left while the track was loading.
+    if let Some(handler_lock) = manager.get(guild_id) {
+        let _ = handler_lock
+            .lock()
+            .await
+            .play(Track::new_with_data(src.into(), Arc::new(metadata)));
     }
 
     Ok(())

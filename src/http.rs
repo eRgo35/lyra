@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::future::Future;
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use poise::serenity_prelude::{async_trait, prelude::TypeMapKey};
@@ -31,9 +31,20 @@ impl TypeMapKey for HttpKey {
 static MEDIA_PROXY: LazyLock<Option<String>> =
     LazyLock::new(|| std::env::var("MEDIA_PROXY").ok().filter(|v| !v.is_empty()));
 
+/// Connecting to any server may take this long (streams have no overall timeout).
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// The HTTP client for lookups such as `weather`: a whole request may take this long.
+pub fn lookup_client() -> reqwest::Result<HttpClient> {
+    HttpClient::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(Duration::from_secs(20))
+        .build()
+}
+
 /// The HTTP client for music, through `MEDIA_PROXY` when it is set.
 pub fn media_client() -> reqwest::Result<HttpClient> {
-    let mut builder = HttpClient::builder();
+    let mut builder = HttpClient::builder().connect_timeout(CONNECT_TIMEOUT);
     if let Some(proxy) = MEDIA_PROXY.as_deref() {
         builder = builder.proxy(reqwest::Proxy::all(proxy)?);
     }
@@ -61,15 +72,73 @@ pub fn ytdl(client: HttpClient, query: impl Into<String>) -> Ytdl {
     }
 }
 
-/// Resolves `query` with one yt-dlp run: the returned source knows its metadata
-/// ([`Ytdl::metadata`]) and keeps the stream URL for when it starts playing.
+/// Resolves `query`: the returned source knows its metadata ([`Ytdl::metadata`]).
+///
+/// A YouTube URL whose audio is cached, or a search made before, needs no yt-dlp run.
+/// Otherwise yt-dlp runs once and the source keeps the stream URL for when it starts.
 pub async fn lookup(
     client: HttpClient,
     query: impl Into<String>,
 ) -> Result<Ytdl, AudioStreamError> {
-    let mut src = ytdl(client, query);
-    src.aux_metadata().await?;
+    let query = query.into();
+    if let Some(metadata) = known_metadata(&query) {
+        let url = metadata.source_url.clone().unwrap_or(query);
+        return Ok(ytdl(client, url).with_metadata(metadata));
+    }
+    let mut src = ytdl(client, query.clone());
+    let metadata = src.aux_metadata().await?;
+    if query.starts_with("ytsearch:") && metadata.source_url.is_some() {
+        let mut searches = SEARCHES.lock().unwrap();
+        if searches.len() >= MAX_SEARCHES {
+            searches.clear();
+        }
+        searches.insert(query, metadata);
+    }
     Ok(src)
+}
+
+/// Results of earlier `ytsearch:` queries, so the same search is not run again.
+static SEARCHES: LazyLock<Mutex<HashMap<String, AuxMetadata>>> = LazyLock::new(Default::default);
+
+/// The most searches [`SEARCHES`] keeps; it starts over when full.
+const MAX_SEARCHES: usize = 1000;
+
+/// Metadata for `query` without yt-dlp: from an earlier search, or saved with the
+/// cached audio of a YouTube URL.
+fn known_metadata(query: &str) -> Option<AuxMetadata> {
+    if let Some(found) = SEARCHES.lock().unwrap().get(query) {
+        return Some(found.clone());
+    }
+    let cache = crate::audio_cache::global()?;
+    let mut metadata = cache.metadata(&video_id(query)?)?;
+    metadata.source_url.get_or_insert_with(|| query.to_string());
+    Some(metadata)
+}
+
+/// YouTube videos being fetched by [`prefetch`].
+static PREFETCHING: LazyLock<Mutex<HashSet<String>>> = LazyLock::new(Default::default);
+
+/// Starts downloading the track with `metadata` into the audio cache, so it starts at
+/// once when it comes up. Does nothing without a cache, or if it is already there.
+pub async fn prefetch(client: HttpClient, metadata: AuxMetadata) {
+    let Some(cache) = crate::audio_cache::global() else {
+        return;
+    };
+    let Some(url) = metadata.source_url.clone() else {
+        return;
+    };
+    let Some(id) = video_id(&url) else {
+        return;
+    };
+    if cache.contains(&id) || !PREFETCHING.lock().unwrap().insert(id.clone()) {
+        return;
+    }
+    let mut src = ytdl(client, url).with_metadata(metadata);
+    // The download goes on in the cache after the reader is dropped.
+    if let Err(e) = src.start(Some(cache)).await {
+        warn!("Could not prefetch {id}: {e}");
+    }
+    PREFETCHING.lock().unwrap().remove(&id);
 }
 
 /// A yt-dlp source, like songbird's [`YoutubeDl`](songbird::input::YoutubeDl) but run once per track.
@@ -110,6 +179,9 @@ static WAIT_FOR_STREAM: LazyLock<bool> =
 fn wait_enabled(value: Option<&str>) -> bool {
     matches!(value, Some("1" | "true"))
 }
+
+/// The yt-dlp format: Opus audio, else the best audio-only, else anything.
+const FORMAT: &str = "ba[acodec=opus]/ba[abr>0][vcodec=none]/best";
 
 /// A kept stream URL is only reused while it has at least this long left.
 const MIN_URL_LIFE: Duration = Duration::from_secs(60);
@@ -242,14 +314,9 @@ impl Ytdl {
     async fn resolve(&self) -> Result<(AuxMetadata, Resolved), AudioStreamError> {
         let output = Command::new("yt-dlp")
             .args(ytdl_proxy_args())
-            // The same format choice as songbird's YoutubeDl.
-            .args([
-                "-j",
-                "-f",
-                "ba[abr>0][vcodec=none]/best",
-                "--no-playlist",
-                "--",
-            ])
+            // Opus first: songbird sends Opus to Discord as is instead of decoding
+            // and re-encoding it (one track at 100% volume). Then songbird's choice.
+            .args(["-j", "-f", FORMAT, "--no-playlist", "--"])
             .arg(&self.query)
             .output()
             .await
@@ -334,7 +401,8 @@ impl Ytdl {
             .clone()
             .filter(|e| !e.is_empty() && e.bytes().all(|b| b.is_ascii_alphanumeric()))
             .unwrap_or_else(|| "bin".to_string());
-        match cache.download(&id, &ext, self.client.clone(), request, resp) {
+        let metadata = self.known.clone();
+        match cache.download(&id, &ext, metadata, self.client.clone(), request, resp) {
             Ok(input) => Ok(AudioStream { input }),
             Err(e) => {
                 // E.g. a full disk: play without caching rather than not at all.

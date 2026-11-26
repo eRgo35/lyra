@@ -25,7 +25,7 @@ pub async fn mute(ctx: Context<'_>) -> Result<(), Error> {
         Some(handler) => handler,
         None => {
             let msg = "I am not in a voice channel!";
-            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
                 .await?;
             return Ok(());
         }
@@ -35,17 +35,17 @@ pub async fn mute(ctx: Context<'_>) -> Result<(), Error> {
 
     if handler.is_mute() {
         if let Err(err) = handler.mute(false).await {
-            fail(ctx, err.to_string()).await.unwrap();
+            fail(ctx, err.to_string()).await?;
         }
 
-        ctx.send(CreateReply::default().embed(embed(ctx, "Unmuted!", "", "").await.unwrap()))
+        ctx.send(CreateReply::default().embed(embed(ctx, "Unmuted!", "", "").await?))
             .await?;
     } else {
         if let Err(err) = handler.mute(true).await {
-            fail(ctx, err.to_string()).await.unwrap();
+            fail(ctx, err.to_string()).await?;
         }
 
-        ctx.send(CreateReply::default().embed(embed(ctx, "Muted!", "", "").await.unwrap()))
+        ctx.send(CreateReply::default().embed(embed(ctx, "Muted!", "", "").await?))
             .await?;
     }
 

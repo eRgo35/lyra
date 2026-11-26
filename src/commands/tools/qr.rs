@@ -14,7 +14,7 @@ pub async fn qr(
     #[rest]
     message: String,
 ) -> Result<(), Error> {
-    let response = CreateReply::default().embed(generate_embed(ctx, message).await.unwrap());
+    let response = CreateReply::default().embed(generate_embed(ctx, message).await?);
     ctx.send(response).await?;
 
     Ok(())

@@ -32,7 +32,7 @@ serenity = { default-features = true, features = [
     "http",
     "rustls_backend",
 ], version = "0.12.5" }
-spotify-parser = "1.0.2"
+spotify-parser = "1.1.0"
 symphonia = { version = "0.5.4", features = [
     "aac",
     "adpcm",
@@ -46,6 +46,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5.2"
 once_cell = "1.19.0"
+mimalloc = "0.1.52"
 
 [dev-dependencies]
 wiremock = "0.6.5"
@@ -55,10 +56,14 @@ wiremock = "0.6.5"
 [patch.crates-io]
 serenity = { git = "https://github.com/eRgo35/serenity", rev = "c897f7dba2e0ed9dba368fc963102e5b7afd622b" }
 
+# Smaller, faster binary (also what Docker and `cargo install` build).
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
-lto = "thin"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

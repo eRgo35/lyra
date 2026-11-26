@@ -1,5 +1,6 @@
 //! `/soundboard`: a server's custom sounds as buttons that play on top of the queue.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use poise::serenity_prelude::{
@@ -8,8 +9,8 @@ use poise::serenity_prelude::{
     EditInteractionResponse, GuildId, UserId,
 };
 use poise::CreateReply;
-use songbird::input::Compose;
-use songbird::TrackEvent;
+use songbird::input::{AuxMetadata, Compose};
+use songbird::tracks::Track;
 
 use super::store::{sound_name, Sound};
 use crate::commands::embeds::{embed, error_embed};
@@ -284,15 +285,25 @@ async fn play(ctx: Context<'_>, sound: &Sound, user: UserId) -> Result<(), Strin
                 .join(guild_id, channel)
                 .await
                 .map_err(|_| "I could not join your voice channel!".to_string())?;
-            call.lock()
-                .await
-                .add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
+            TrackErrorNotifier::attach(
+                &mut *call.lock().await,
+                serenity_ctx.http.clone(),
+                ctx.channel_id(),
+            );
             call
         }
     };
 
-    let src = crate::http::ytdl(ctx.data().media_client.clone(), sound.source.clone());
-    let _ = call.lock().await.play_input(src.into());
+    let metadata = AuxMetadata {
+        title: Some(sound.title.clone()),
+        ..AuxMetadata::default()
+    };
+    let src = crate::http::ytdl(ctx.data().media_client.clone(), sound.source.clone())
+        .with_metadata(metadata.clone());
+    let _ = call
+        .lock()
+        .await
+        .play(Track::new_with_data(src.into(), Arc::new(metadata)));
     Ok(())
 }
 

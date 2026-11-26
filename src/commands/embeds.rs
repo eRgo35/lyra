@@ -37,14 +37,8 @@ fn append_detail(msg: &str, detail: &str, enabled: bool) -> String {
 }
 
 pub async fn fail(ctx: Context<'_>, err: String) -> Result<(), Error> {
-    ctx.send(
-        CreateReply::default().embed(
-            error_embed(ctx, &format!("Failed: {:?}", err))
-                .await
-                .unwrap(),
-        ),
-    )
-    .await?;
+    ctx.send(CreateReply::default().embed(error_embed(ctx, &format!("Failed: {:?}", err)).await?))
+        .await?;
 
     Ok(())
 }

@@ -23,7 +23,7 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
 
     if manager.get(guild_id).is_none() {
         let msg = "I am not in a voice channel!";
-        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
 
         return Ok(());
@@ -31,15 +31,11 @@ pub async fn leave(ctx: Context<'_>) -> Result<(), Error> {
 
     ctx.data().repeat_all.set(guild_id, false);
     if let Err(err) = manager.remove(guild_id).await {
-        fail(ctx, err.to_string()).await.unwrap();
+        fail(ctx, err.to_string()).await?;
     }
 
     ctx.send(
-        CreateReply::default().embed(
-            embed(ctx, "Left!", "I left the voice channel", "")
-                .await
-                .unwrap(),
-        ),
+        CreateReply::default().embed(embed(ctx, "Left!", "I left the voice channel", "").await?),
     )
     .await?;
 

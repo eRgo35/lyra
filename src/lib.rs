@@ -11,6 +11,7 @@ use tracing::{error, info, warn};
 pub mod audio_cache;
 pub mod commands;
 pub mod http;
+pub mod idle;
 pub mod reminders;
 pub mod storage;
 
@@ -135,13 +136,15 @@ pub fn parse_guild_id(raw: Option<&str>) -> Result<Option<u64>, String> {
 }
 
 /// Builds the Discord client: framework, slash command registration (in `guild_id`, or
-/// globally when `None`), songbird and the shared HTTP client.
+/// globally when `None`), songbird and the shared HTTP client. With `auto_leave`, the
+/// bot leaves voice channels it has been idle in for that long ([`idle`]).
 pub async fn build_client(
     token: &str,
     prefix: String,
     guild_id: Option<u64>,
+    auto_leave: Option<Duration>,
 ) -> Result<serenity::Client, Error> {
-    let http_client = HttpClient::new();
+    let http_client = http::lookup_client()?;
     let media_client = http::media_client()?;
     let data_media_client = media_client.clone();
 
@@ -171,15 +174,6 @@ pub async fn build_client(
         },
 
         skip_checks_for_owners: false,
-        event_handler: |_framework_ctx, event| {
-            Box::pin(async move {
-                info!(
-                    "Got an event in event handler: {:?}",
-                    event.snake_case_name()
-                );
-                Ok(())
-            })
-        },
         ..Default::default()
     };
 
@@ -202,10 +196,21 @@ pub async fn build_client(
                 let reminders = Arc::new(reminders::Reminders::load(REMINDERS_FILE).await);
                 tokio::spawn(reminders.clone().run(ctx.http.clone()));
 
+                let repeat_all = Arc::new(music::repeat_all::RepeatAll::default());
+                if let Some(after) = auto_leave {
+                    let manager = songbird::get(ctx).await.expect("songbird registered");
+                    tokio::spawn(idle::run(
+                        ctx.cache.clone(),
+                        manager,
+                        repeat_all.clone(),
+                        after,
+                    ));
+                }
+
                 Ok(Data {
                     http_client,
                     media_client: data_media_client,
-                    repeat_all: Default::default(),
+                    repeat_all,
                     sounds: music::soundboard::store::SoundStore::new(SOUNDBOARD_DIR),
                     reminders,
                 })
@@ -214,8 +219,13 @@ pub async fn build_client(
         .options(options)
         .build();
 
-    let intents =
-        serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
+    // Only what the commands use: every other event (typing, reactions, ...) would be
+    // received, parsed and cached for nothing.
+    let intents = serenity::GatewayIntents::GUILDS
+        | serenity::GatewayIntents::GUILD_VOICE_STATES
+        | serenity::GatewayIntents::GUILD_MESSAGES
+        | serenity::GatewayIntents::DIRECT_MESSAGES
+        | serenity::GatewayIntents::MESSAGE_CONTENT;
 
     serenity::ClientBuilder::new(token, intents)
         .framework(framework)

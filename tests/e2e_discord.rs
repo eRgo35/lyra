@@ -37,7 +37,7 @@ async fn bot_boots_and_registers_its_slash_commands() {
         .map(|name| name.trim_matches('"').to_string())
         .collect();
 
-    let mut client = lyra::build_client(&token, "!".to_string(), Some(guild_id))
+    let mut client = lyra::build_client(&token, "!".to_string(), Some(guild_id), None)
         .await
         .expect("client builds");
     let shards = client.shard_manager.clone();
@@ -46,6 +46,12 @@ async fn bot_boots_and_registers_its_slash_commands() {
     let http = Http::new(&token);
     let bot = http.get_current_user().await.expect("token is valid");
     eprintln!("logged in as {}", bot.name);
+    // Listing commands needs the application ID, which a bare `Http` doesn't know.
+    let app = http
+        .get_current_application_info()
+        .await
+        .expect("application info");
+    http.set_application_id(app.id);
 
     // Registration happens in the framework setup, after the gateway Ready event.
     let mut missing = expected.clone();

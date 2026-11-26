@@ -15,7 +15,7 @@ pub async fn uptime(ctx: Context<'_>) -> Result<(), Error> {
 
     let message = uptime_message(uptime);
 
-    ctx.send(CreateReply::default().embed(embed(ctx, "Uptime", "", &message).await.unwrap()))
+    ctx.send(CreateReply::default().embed(embed(ctx, "Uptime", "", &message).await?))
         .await?;
 
     Ok(())

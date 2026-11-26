@@ -10,11 +10,8 @@ use poise::serenity_prelude::{
     Color, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, Timestamp,
 };
 use poise::CreateReply;
-use songbird::events::TrackEvent;
 use songbird::input::AuxMetadata;
-use songbird::tracks::TrackQueue;
 use songbird::Call;
-use spotify_parser;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
@@ -48,8 +45,11 @@ pub async fn play(
 pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) -> Result<(), Error> {
     // Resolving with yt-dlp often takes longer than Discord's 3 s to acknowledge a slash command.
     ctx.defer().await?;
-    let guild_id = ctx.guild_id().unwrap();
-    let manager = songbird::get(ctx.serenity_context()).await.unwrap().clone();
+    let guild_id = ctx.guild_id().expect("guild_only");
+    let manager = songbird::get(ctx.serenity_context())
+        .await
+        .expect("Songbird client placed at init")
+        .clone();
     let enqueuer = Enqueuer {
         manager: manager.clone(),
         guild_id,
@@ -57,66 +57,95 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
         repeat: ctx.data().repeat_all.clone(),
     };
 
-    let mut rest_playlist: VecDeque<Entry> = VecDeque::new();
-
-    if manager.get(guild_id).is_none() {
-        let channel_id = ctx
-            .guild()
-            .unwrap()
-            .voice_states
-            .get(&ctx.author().id)
-            .and_then(|voice_state| voice_state.channel_id);
-
-        let connect_to = match channel_id {
-            Some(channel) => channel,
-            None => {
-                let msg = "I am not in a voice channel!";
-                ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
-                    .await?;
-                return Ok(());
+    let existing = manager.get(guild_id);
+    let connect_to = match &existing {
+        Some(_) => None,
+        None => {
+            let channel = ctx.guild().and_then(|guild| {
+                guild
+                    .voice_states
+                    .get(&ctx.author().id)
+                    .and_then(|voice_state| voice_state.channel_id)
+            });
+            match channel {
+                Some(channel) => Some(channel),
+                None => {
+                    let msg = "Join a voice channel first!";
+                    ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                        .await?;
+                    return Ok(());
+                }
             }
-        };
-
-        if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
-            let mut handler = handler_lock.lock().await;
-            handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
-
-            rest_playlist = handle_play(ctx, song, handler, &enqueuer, force).await?;
-        } else {
-            let msg = "Failed to join the voice channel!";
-            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
-                .await?;
         }
-    } else {
-        let handler = manager.get(guild_id).unwrap();
-        let handler = handler.lock().await;
-        rest_playlist = handle_play(ctx, song, handler, &enqueuer, force).await?;
-    }
+    };
 
-    handle_playlist(rest_playlist, &enqueuer).await?;
+    // Joining and resolving at once; neither holds the call's lock, which other
+    // commands (and songbird itself) need while yt-dlp runs.
+    let join = async {
+        match connect_to {
+            Some(channel) => Some(manager.join(guild_id, channel).await),
+            None => None,
+        }
+    };
+    let (resolved, joined) = tokio::join!(resolve(ctx, song, &enqueuer, force), join);
 
-    Ok(())
+    let call = match (existing, joined) {
+        (Some(call), _) => call,
+        (None, Some(Ok(call))) => {
+            TrackErrorNotifier::attach(
+                &mut *call.lock().await,
+                ctx.serenity_context().http.clone(),
+                ctx.channel_id(),
+            );
+            call
+        }
+        _ => {
+            let msg = "Failed to join the voice channel!";
+            ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
+                .await?;
+            return Ok(());
+        }
+    };
+    let (src, rest) = resolved?;
+    let Some(src) = src else {
+        return handle_playlist(rest, &enqueuer).await;
+    };
+
+    let metadata = src.metadata().cloned().unwrap_or_default();
+    let position = {
+        let mut handler = call.lock().await;
+        let position = handler.queue().len();
+        enqueuer
+            .enqueue_source(&mut handler, src, metadata.clone())
+            .await;
+        if force && handler.queue().len() > 1 {
+            play_now(&mut handler, &enqueuer).await;
+        }
+        position
+    };
+    ctx.send(
+        CreateReply::default()
+            .embed(generate_embed(ctx, metadata, position, rest.len(), force).await?),
+    )
+    .await?;
+
+    handle_playlist(rest, &enqueuer).await
 }
 
-async fn handle_play<'a>(
-    ctx: Context<'a>,
+/// The first track's source (`None` after telling the user why it can't be played)
+/// and the rest of the entries.
+async fn resolve(
+    ctx: Context<'_>,
     song: String,
-    mut handler: tokio::sync::MutexGuard<'a, Call>,
     enqueuer: &Enqueuer,
     force: bool,
-) -> Result<VecDeque<Entry>, Error> {
+) -> Result<(Option<Ytdl>, VecDeque<Entry>), Error> {
     let mut results = match parse_data(song).await {
         Ok(results) => results,
-        Err(e) => {
-            warn!("Failed to run yt-dlp: {e}");
-            let msg = if e.kind() == std::io::ErrorKind::NotFound {
-                "`yt-dlp` was not found! Install it and make sure it is on PATH.".to_string()
-            } else {
-                format!("Failed to run `yt-dlp`: {e}")
-            };
+        Err(msg) => {
             ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
                 .await?;
-            return Ok(VecDeque::new());
+            return Ok((None, VecDeque::new()));
         }
     };
 
@@ -124,7 +153,7 @@ async fn handle_play<'a>(
         let msg = "No tracks found!";
         ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
-        return Ok(results);
+        return Ok((None, results));
     };
 
     if force {
@@ -143,35 +172,13 @@ async fn handle_play<'a>(
                 let msg = with_detail("Could not load that track!", &e);
                 ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
                     .await?;
-                return Ok(results);
+                // The rest of a playlist is still worth playing.
+                return Ok((None, results));
             }
         },
     };
 
-    let aux_metadata = src.metadata().cloned().unwrap_or_default();
-    ctx.send(
-        CreateReply::default().embed(
-            generate_embed(
-                ctx,
-                aux_metadata.clone(),
-                handler.queue(),
-                results.len(),
-                force,
-            )
-            .await?,
-        ),
-    )
-    .await?;
-
-    enqueuer
-        .enqueue_source(&mut handler, src, aux_metadata)
-        .await;
-
-    if force && handler.queue().len() > 1 {
-        play_now(&mut handler, enqueuer).await;
-    }
-
-    Ok(results)
+    Ok((Some(src), results))
 }
 
 /// Moves the last enqueued track to the front and starts it, queueing a fresh copy of
@@ -228,20 +235,36 @@ impl Entry {
     }
 }
 
-/// Turns `play` input (search terms, URLs, playlists, Spotify links) into entries to enqueue.
-pub async fn parse_data(data: String) -> std::io::Result<VecDeque<Entry>> {
+/// Turns `play` input (search terms, URLs, playlists, Spotify links) into entries to
+/// enqueue. Errors are messages for the user.
+pub async fn parse_data(data: String) -> Result<VecDeque<Entry>, String> {
     let mut tracks = VecDeque::new();
 
-    for track in spotify_parser::retrieve_async_url(&data)
-        .await
-        .unwrap_or(vec![data])
-    {
+    let inputs = match spotify_parser::retrieve_async_url(&data).await {
+        Ok(tracks) => tracks,
+        Err(spotify_parser::ParseError::InvalidUrl) => vec![data],
+        Err(e) => {
+            warn!("Spotify lookup failed: {e}");
+            return Err(format!("Could not read that Spotify link! ({e})"));
+        }
+    };
+
+    for track in inputs {
         if track.contains("?list=") {
             let output = Command::new("yt-dlp")
                 .args(crate::http::ytdl_proxy_args())
                 .args(["-j", "--flat-playlist", "--", &track])
                 .output()
-                .await?;
+                .await
+                .map_err(|e| {
+                    warn!("Failed to run yt-dlp: {e}");
+                    if e.kind() == std::io::ErrorKind::NotFound {
+                        "`yt-dlp` was not found! Install it and make sure it is on PATH."
+                            .to_string()
+                    } else {
+                        format!("Failed to run `yt-dlp`: {e}")
+                    }
+                })?;
 
             tracks.extend(playlist_entries(&String::from_utf8_lossy(&output.stdout)));
         } else if track.starts_with("http") {
@@ -299,8 +322,15 @@ fn playlist_entries(output: &str) -> Vec<Entry> {
         .collect()
 }
 
-/// How many yt-dlp metadata lookups run at once for entries without known metadata.
-const METADATA_LOOKUPS: usize = 4;
+/// How many yt-dlp metadata lookups run at once for entries without known metadata
+/// (e.g. a Spotify playlist): one per two CPU cores, from 1 to 4. Each is a Python
+/// process (often with deno), so more would only slow a small machine down.
+fn metadata_lookups() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get() / 2)
+        .unwrap_or(1)
+        .clamp(1, 4)
+}
 
 /// The source for `query` with its metadata, from one yt-dlp run.
 async fn lookup_source(
@@ -311,7 +341,7 @@ async fn lookup_source(
 }
 
 async fn handle_playlist(playlist: VecDeque<Entry>, enqueuer: &Enqueuer) -> Result<(), Error> {
-    let lookups = Arc::new(Semaphore::new(METADATA_LOOKUPS));
+    let lookups = Arc::new(Semaphore::new(metadata_lookups()));
 
     // Start all lookups up front (bounded by the semaphore) but enqueue in playlist order.
     let pending = playlist
@@ -359,10 +389,11 @@ async fn handle_playlist(playlist: VecDeque<Entry>, enqueuer: &Enqueuer) -> Resu
     Ok(())
 }
 
+/// `position` is the queue length before the track was added.
 async fn generate_embed(
     ctx: Context<'_>,
     metadata: AuxMetadata,
-    queue: &TrackQueue,
+    position: usize,
     remaining: usize,
     force: bool,
 ) -> Result<CreateEmbed, Error> {
@@ -376,14 +407,14 @@ async fn generate_embed(
     } = metadata;
     let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
     let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
-    let mut description = format!("Enqueued @ {}", queue.len() + 1);
+    let mut description = format!("Enqueued @ {}", position + 1);
     let mut tracks = "Tracks enqueued";
 
     if remaining == 0 {
         tracks = "Track enqueued";
     }
 
-    if queue.is_empty() || force {
+    if position == 0 || force {
         description = "Playing now!".to_string();
     }
 

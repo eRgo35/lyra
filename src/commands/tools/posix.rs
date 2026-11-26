@@ -20,8 +20,7 @@ pub async fn posix(ctx: Context<'_>) -> Result<(), Error> {
                 "since Jan 1st 1970",
                 &format!("{} ms", time),
             )
-            .await
-            .unwrap(),
+            .await?,
         ),
     )
     .await?;

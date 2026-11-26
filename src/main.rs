@@ -1,6 +1,10 @@
 use lyra::commands::tools::uptime::PROCESS_UPTIME;
 use tracing::{error, warn};
 
+// Less fragmentation and memory than glibc's malloc with many threads.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -21,7 +25,16 @@ async fn main() {
         }
     };
 
-    let mut client = lyra::build_client(&token, prefix, guild_id)
+    let auto_leave = match lyra::idle::parse_auto_leave(std::env::var("AUTO_LEAVE").ok().as_deref())
+    {
+        Ok(auto_leave) => auto_leave,
+        Err(msg) => {
+            error!("{msg}");
+            std::process::exit(1);
+        }
+    };
+
+    let mut client = lyra::build_client(&token, prefix, guild_id, auto_leave)
         .await
         .expect("Error creating client");
 

@@ -35,24 +35,18 @@ pub async fn skip(ctx: Context<'_>) -> Result<(), Error> {
         let track = track_raw.get(1);
         let queue_length = queue.len().saturating_sub(1);
 
-        let mut response = CreateReply::default().embed(
-            embed(ctx, "Skipped!", "The queue is empty!", "")
-                .await
-                .unwrap(),
-        );
+        let mut response =
+            CreateReply::default().embed(embed(ctx, "Skipped!", "The queue is empty!", "").await?);
 
         if let Some(track) = track {
-            response = CreateReply::default().embed(
-                generate_embed(ctx, track.clone(), queue_length)
-                    .await
-                    .unwrap(),
-            );
+            response = CreateReply::default()
+                .embed(generate_embed(ctx, track.clone(), queue_length).await?);
         };
 
         ctx.send(response).await?;
     } else {
         let msg = "I am not in a voice channel!";
-        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
     }
 

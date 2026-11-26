@@ -132,7 +132,7 @@ pub async fn help(
         text
     };
 
-    ctx.send(CreateReply::default().embed(embed(ctx, "Lyra", &reply, "").await.unwrap()))
+    ctx.send(CreateReply::default().embed(embed(ctx, "Lyra", &reply, "").await?))
         .await?;
     Ok(())
 }
