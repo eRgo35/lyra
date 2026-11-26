@@ -20,16 +20,13 @@ pub async fn pause(ctx: Context<'_>) -> Result<(), Error> {
         let _ = queue.pause();
 
         ctx.send(
-            CreateReply::default().embed(
-                embed(ctx, "Paused!", "Currently playing song is now paused!", "")
-                    .await
-                    .unwrap(),
-            ),
+            CreateReply::default()
+                .embed(embed(ctx, "Paused!", "Currently playing song is now paused!", "").await?),
         )
         .await?;
     } else {
         let msg = "I am not in a voice channel!";
-        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
     }
 

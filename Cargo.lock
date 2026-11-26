@@ -1989,6 +1989,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libmimalloc-sys"
+version = "0.1.49"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a45a52f43e1c16f667ccfe4dd8c85b7f7c204fd5e3bf46c5b0db9a5c3c0b8e9"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "libopus_sys"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2052,6 +2061,7 @@ name = "lyra"
 version = "0.20.0"
 dependencies = [
  "dotenvy",
+ "mimalloc",
  "nonmax",
  "once_cell",
  "poise",
@@ -2105,6 +2115,15 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "mimalloc"
+version = "0.1.52"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d4139bb28d14ad1facf21d5eb8825051b326e172d216b39f6d31df53cc97862"
+dependencies = [
+ "libmimalloc-sys",
+]
 
 [[package]]
 name = "mime"
@@ -3802,16 +3821,15 @@ dependencies = [
 
 [[package]]
 name = "spotify-parser"
-version = "1.0.2"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e937a250b9b7426d0c045d64580b93945dc9e324d5aef5c1379e691c3ce11a6f"
+checksum = "18aa4a58e0cf54c56bf196feb9cd1d9829453ce1adcc8c248096edf38d40749e"
 dependencies = [
  "regex",
  "reqwest",
  "scraper",
  "serde",
  "serde_json",
- "tokio",
 ]
 
 [[package]]

@@ -6,6 +6,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The next track in the queue is downloaded into the audio cache as soon as the
+  current one starts, so there is no gap between tracks even where yt-dlp is
+  slow (songbird only readied it 5 s ahead).
+- Cached tracks and repeated searches are enqueued without running yt-dlp: the
+  cache keeps each track's metadata (`<id>.json`), and search results are kept
+  in `data/searches.json`, so they survive restarts.
+- A YouTube link added while something is playing is answered at once from
+  YouTube's oEmbed (about 0.1 s instead of up to 10 s for yt-dlp on a slow
+  machine); its stream and duration are fetched in the background before it
+  plays. Unknown durations show as `--:--`.
+- `play`, `forceplay`, `effect` and `stream` no longer hold the voice call's lock
+  while yt-dlp runs, so `skip`, `queue`, `pause` etc. answer at once while a track
+  is loading. `play` joins the channel and resolves the track at the same time.
+- Opus audio is preferred from YouTube, which songbird can send to Discord without
+  decoding and re-encoding (one track at 100% volume): much less CPU.
+- Only the gateway events the bot uses are received (no typing, reactions,
+  invites, ...), and gateway events are no longer logged one by one.
+- Release builds use thin LTO with one codegen unit, and the mimalloc allocator.
+- Playlist lookups without metadata (e.g. Spotify) run one yt-dlp per two CPU
+  cores (1 to 4) instead of always 4.
+- HTTP requests have a connect timeout, and lookups (`weather`, ...) time out
+  after 20 s instead of hanging.
+- `AUDIO_CACHE_SIZE` defaults to `1G` (was `512M`).
+- `queue` shows all tracks, ten per page, with ◀ ▶ buttons.
+- `volume` is kept for the following tracks (it used to reset to 100% on the
+  next one) and is limited to 0–200%.
+- The Docker image keeps yt-dlp's cache in the data volume.
+
+### Added
+
+- `AUTO_LEAVE` (e.g. `10m`): leave the voice channel after that long with an
+  empty queue or nobody listening. Off by default.
+
+### Fixed
+
+- A track that fails to play is now reported in the channel instead of just
+  going silent, and joining again no longer reports each failure twice.
+- A Spotify link that can't be read gives an error reply instead of a panic
+  (`spotify-parser` 1.1.0), and artists of album/playlist tracks are no longer
+  joined with `&nbsp;`, which broke their YouTube search.
+
 ## [0.20.0] - 2026-11-24
 
 ### Changed

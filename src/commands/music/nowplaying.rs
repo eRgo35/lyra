@@ -34,7 +34,7 @@ pub async fn nowplaying(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     };
 
-    let metadata = track.data::<AuxMetadata>().as_ref().clone();
+    let metadata = crate::http::with_cached_details(&track.data::<AuxMetadata>());
     let position = track
         .get_info()
         .await

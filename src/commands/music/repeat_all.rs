@@ -8,7 +8,7 @@ use serenity::all::GuildId;
 use serenity::async_trait;
 use songbird::events::{Event, EventContext, EventHandler, TrackEvent};
 use songbird::input::AuxMetadata;
-use songbird::tracks::{Track, TrackHandle};
+use songbird::tracks::{Track, TrackHandle, TrackQueue};
 use songbird::{Call, Songbird};
 
 /// Per-guild `repeat all` state, shared by commands and track event handlers.
@@ -60,6 +60,7 @@ pub struct Enqueuer {
     pub guild_id: GuildId,
     pub http_client: Client,
     pub repeat: Arc<RepeatAll>,
+    pub volumes: Arc<crate::commands::music::volume::Volumes>,
 }
 
 impl Enqueuer {
@@ -84,8 +85,9 @@ impl Enqueuer {
         src: crate::http::Ytdl,
         metadata: AuxMetadata,
     ) -> TrackHandle {
+        let volume = self.volumes.get(self.guild_id);
         let handle = call
-            .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())))
+            .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())).volume(volume))
             .await;
 
         let _ = handle.add_event(
@@ -95,8 +97,54 @@ impl Enqueuer {
                 metadata,
             },
         );
+        let _ = handle.add_event(
+            Event::Track(TrackEvent::Play),
+            PrefetchNext {
+                enqueuer: self.clone(),
+            },
+        );
+        // Next in line already: no track will start before it, so fetch it now.
+        prefetch_next(call.queue(), &self.http_client);
 
         handle
+    }
+}
+
+/// Starts downloading the track after the current one, so it starts without a gap
+/// even when yt-dlp is slow (songbird only readies it 5 s before it is needed).
+fn prefetch_next(queue: &TrackQueue, client: &Client) {
+    let Some(next) = queue.current_queue().get(1).cloned() else {
+        return;
+    };
+    let metadata = next.data::<AuxMetadata>().as_ref().clone();
+    tokio::spawn(crate::http::prefetch(client.clone(), metadata));
+}
+
+/// When a track starts: gives it the guild's current volume (it may have changed
+/// since the track was queued) and prefetches the next one.
+struct PrefetchNext {
+    enqueuer: Enqueuer,
+}
+
+#[async_trait]
+impl EventHandler for PrefetchNext {
+    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
+        if let EventContext::Track(tracks) = ctx {
+            let volume = self.enqueuer.volumes.get(self.enqueuer.guild_id);
+            for (state, handle) in *tracks {
+                if (state.volume - volume).abs() > f32::EPSILON {
+                    let _ = handle.set_volume(volume);
+                }
+            }
+        }
+        let enqueuer = self.enqueuer.clone();
+        tokio::spawn(async move {
+            if let Some(call) = enqueuer.manager.get(enqueuer.guild_id) {
+                let queue = call.lock().await.queue().clone();
+                prefetch_next(&queue, &enqueuer.http_client);
+            }
+        });
+        None
     }
 }
 

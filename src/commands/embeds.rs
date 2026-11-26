@@ -37,14 +37,8 @@ fn append_detail(msg: &str, detail: &str, enabled: bool) -> String {
 }
 
 pub async fn fail(ctx: Context<'_>, err: String) -> Result<(), Error> {
-    ctx.send(
-        CreateReply::default().embed(
-            error_embed(ctx, &format!("Failed: {:?}", err))
-                .await
-                .unwrap(),
-        ),
-    )
-    .await?;
+    ctx.send(CreateReply::default().embed(error_embed(ctx, &format!("Failed: {:?}", err)).await?))
+        .await?;
 
     Ok(())
 }
@@ -84,6 +78,14 @@ pub async fn embed(
         );
 
     Ok(embed)
+}
+
+/// `03:45`, or `--:--` while the duration is not known yet.
+pub fn format_duration(duration: Option<std::time::Duration>) -> String {
+    match duration {
+        Some(d) => format!("{:02}:{:02}", d.as_secs() / 60, d.as_secs() % 60),
+        None => "--:--".to_string(),
+    }
 }
 
 #[cfg(test)]

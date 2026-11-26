@@ -36,14 +36,13 @@ pub async fn stop(ctx: Context<'_>) -> Result<(), Error> {
                     "Playback stopped!",
                     "Queue destroyed! Bot will stay and chill with you in a vc",
                 )
-                .await
-                .unwrap(),
+                .await?,
             ),
         )
         .await?;
     } else {
         let msg = "I am not in a voice channel!";
-        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await.unwrap()))
+        ctx.send(CreateReply::default().embed(error_embed(ctx, msg).await?))
             .await?;
     }
 

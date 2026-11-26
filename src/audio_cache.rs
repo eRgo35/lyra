@@ -4,6 +4,9 @@
 //! it grows, so playback starts on the first bytes. When the download completes it is
 //! renamed to `<id>.<ext>`; later plays read it from disk. The least recently played
 //! files are deleted when the total size goes over the limit.
+//!
+//! Next to each file, `<id>.json` keeps the track's metadata, so a cached track can
+//! be enqueued and played without running yt-dlp at all.
 
 use std::collections::HashMap;
 use std::io::{self, Read, Seek, SeekFrom};
@@ -11,15 +14,17 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, LazyLock, Mutex};
 use std::time::{Duration, SystemTime};
 
+use serde::{Deserialize, Serialize};
+use songbird::input::AuxMetadata;
 use symphonia::core::io::MediaSource;
 use tokio::io::AsyncWriteExt;
 use tracing::warn;
 
-/// The default `AUDIO_CACHE_SIZE`: 512 MiB.
-const DEFAULT_SIZE: u64 = 512 * 1024 * 1024;
+/// The default `AUDIO_CACHE_SIZE`: 1 GiB.
+const DEFAULT_SIZE: u64 = 1024 * 1024 * 1024;
 
 /// `AUDIO_CACHE_SIZE`: bytes, or with a `K`/`M`/`G` suffix (binary units); `0` turns
-/// the cache off. Unset or invalid values give 512 MiB.
+/// the cache off. Unset or invalid values give 1 GiB.
 pub fn parse_size(value: Option<&str>) -> u64 {
     let Some(value) = value.map(str::trim).filter(|v| !v.is_empty()) else {
         return DEFAULT_SIZE;
@@ -33,7 +38,7 @@ pub fn parse_size(value: Option<&str>) -> u64 {
     match number.parse::<u64>() {
         Ok(n) => n.saturating_mul(unit),
         Err(_) => {
-            warn!("Invalid AUDIO_CACHE_SIZE {value:?}; using 512M");
+            warn!("Invalid AUDIO_CACHE_SIZE {value:?}; using 1G");
             DEFAULT_SIZE
         }
     }
@@ -107,10 +112,59 @@ struct CachedFile {
     played: SystemTime,
 }
 
+/// The metadata kept in `<id>.json` (songbird's [`AuxMetadata`] is not serializable).
+#[derive(Serialize, Deserialize)]
+pub(crate) struct StoredMetadata {
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    date: Option<String>,
+    channel: Option<String>,
+    duration: Option<f64>,
+    source_url: Option<String>,
+    thumbnail: Option<String>,
+}
+
+impl From<&AuxMetadata> for StoredMetadata {
+    fn from(m: &AuxMetadata) -> Self {
+        StoredMetadata {
+            title: m.title.clone(),
+            artist: m.artist.clone(),
+            album: m.album.clone(),
+            date: m.date.clone(),
+            channel: m.channel.clone(),
+            duration: m.duration.map(|d| d.as_secs_f64()),
+            source_url: m.source_url.clone(),
+            thumbnail: m.thumbnail.clone(),
+        }
+    }
+}
+
+impl From<StoredMetadata> for AuxMetadata {
+    fn from(m: StoredMetadata) -> Self {
+        AuxMetadata {
+            title: m.title,
+            artist: m.artist,
+            album: m.album,
+            date: m.date,
+            channel: m.channel,
+            duration: m
+                .duration
+                .filter(|d| d.is_finite() && *d >= 0.0)
+                .map(Duration::from_secs_f64),
+            source_url: m.source_url,
+            thumbnail: m.thumbnail,
+            ..AuxMetadata::default()
+        }
+    }
+}
+
 /// A download in progress, shared by its writer task and the readers playing it.
 struct Download {
     part: PathBuf,
     len: Option<u64>,
+    /// Written to `<id>.json` once the download is kept.
+    metadata: Option<AuxMetadata>,
     progress: Mutex<Progress>,
     changed: Condvar,
 }
@@ -147,6 +201,9 @@ impl AudioCache {
                 let _ = std::fs::remove_file(&path);
                 continue;
             }
+            if name.ends_with(".json") {
+                continue;
+            }
             let meta = entry.metadata()?;
             let Some((id, _)) = name.split_once('.') else {
                 continue;
@@ -163,6 +220,15 @@ impl AudioCache {
                 },
             );
         }
+        // Metadata whose audio is gone (e.g. deleted by hand).
+        for entry in std::fs::read_dir(&dir)?.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if let Some(id) = name.strip_suffix(".json") {
+                if !state.files.contains_key(id) {
+                    let _ = std::fs::remove_file(entry.path());
+                }
+            }
+        }
         let cache = Arc::new(AudioCache {
             dir,
             limit,
@@ -176,6 +242,26 @@ impl AudioCache {
     /// The audio for `id`: the cached file, or the file still being downloaded.
     pub fn get(&self, id: &str) -> Option<Box<dyn MediaSource>> {
         Self::existing(&mut self.state.lock().unwrap(), id)
+    }
+
+    /// Whether `id` is cached or downloading.
+    pub fn contains(&self, id: &str) -> bool {
+        let state = self.state.lock().unwrap();
+        state.files.contains_key(id) || state.downloads.contains_key(id)
+    }
+
+    /// The metadata saved with `id`, if its audio is cached.
+    pub fn metadata(&self, id: &str) -> Option<AuxMetadata> {
+        if !self.state.lock().unwrap().files.contains_key(id) {
+            return None;
+        }
+        let bytes = std::fs::read(self.metadata_path(id)).ok()?;
+        let stored: StoredMetadata = serde_json::from_slice(&bytes).ok()?;
+        Some(stored.into())
+    }
+
+    fn metadata_path(&self, id: &str) -> PathBuf {
+        self.dir.join(format!("{id}.json"))
     }
 
     fn existing(state: &mut State, id: &str) -> Option<Box<dyn MediaSource>> {
@@ -207,10 +293,12 @@ impl AudioCache {
     /// reader that plays it while it downloads. The download goes on if the reader is
     /// dropped, and resumes with a range of `request` if the connection drops. If `id`
     /// was cached or started meanwhile, `resp` is dropped and that is returned instead.
+    /// `metadata` is saved with the file when it is kept.
     pub fn download(
         self: &Arc<Self>,
         id: &str,
         ext: &str,
+        metadata: Option<AuxMetadata>,
         client: reqwest::Client,
         request: reqwest::Request,
         resp: reqwest::Response,
@@ -224,6 +312,7 @@ impl AudioCache {
         let download = Arc::new(Download {
             part,
             len: resp.content_length(),
+            metadata,
             progress: Mutex::default(),
             changed: Condvar::new(),
         });
@@ -265,6 +354,13 @@ impl AudioCache {
                 return Ok(());
             }
             std::fs::rename(&download.part, path).map_err(|e| e.to_string())?;
+            if let Some(metadata) = &download.metadata {
+                let json = serde_json::to_vec(&StoredMetadata::from(metadata))
+                    .expect("metadata serializes");
+                if let Err(e) = std::fs::write(self.metadata_path(id), json) {
+                    warn!("Could not save metadata of {id}: {e}");
+                }
+            }
             state.files.insert(
                 id.to_string(),
                 CachedFile {
@@ -298,6 +394,7 @@ impl AudioCache {
             };
             let file = state.files.remove(&oldest).unwrap();
             let _ = std::fs::remove_file(&file.path);
+            let _ = std::fs::remove_file(self.metadata_path(&oldest));
             total -= file.size;
         }
     }
@@ -505,7 +602,7 @@ mod tests {
 
     fn download(cache: &Arc<AudioCache>, f: Fetched) -> Box<dyn MediaSource> {
         cache
-            .download(ID, "webm", f.client, f.request, f.resp)
+            .download(ID, "webm", None, f.client, f.request, f.resp)
             .unwrap()
     }
 
@@ -575,13 +672,13 @@ mod tests {
 
     #[test]
     fn parse_size_units() {
-        assert_eq!(parse_size(None), 536_870_912);
+        assert_eq!(parse_size(None), 1_073_741_824);
         assert_eq!(parse_size(Some("0")), 0);
         assert_eq!(parse_size(Some("1024")), 1024);
         assert_eq!(parse_size(Some("2K")), 2048);
         assert_eq!(parse_size(Some("512M")), 536_870_912);
         assert_eq!(parse_size(Some("1G")), 1_073_741_824);
-        assert_eq!(parse_size(Some("junk")), 536_870_912);
+        assert_eq!(parse_size(Some("junk")), 1_073_741_824);
     }
 
     #[test]
@@ -612,6 +709,50 @@ mod tests {
         wait_until(|| dir.join(format!("{ID}.webm")).exists()).await;
         let cached = cache.get(ID).expect("cached after download");
         assert_eq!(read_all(cached).await.unwrap(), expected);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn metadata_is_kept_with_the_file() {
+        let dir = temp_dir("metadata");
+        let cache = AudioCache::open(&dir, 1 << 20).unwrap();
+        let (_server, f) = serve(body(100)).await;
+        let metadata = songbird::input::AuxMetadata {
+            title: Some("Never Gonna Give You Up".into()),
+            duration: Some(Duration::from_secs(213)),
+            source_url: Some(format!("https://www.youtube.com/watch?v={ID}")),
+            ..Default::default()
+        };
+        assert!(cache.metadata(ID).is_none());
+        let src = cache
+            .download(
+                ID,
+                "webm",
+                Some(metadata.clone()),
+                f.client,
+                f.request,
+                f.resp,
+            )
+            .unwrap();
+        assert!(cache.contains(ID));
+        read_all(src).await.unwrap();
+        wait_until(|| cache.metadata(ID).is_some()).await;
+
+        // Indexed again after a restart, but not as a second audio file.
+        let reopened = AudioCache::open(&dir, 1 << 20).unwrap();
+        assert_eq!(reopened.metadata(ID), Some(metadata));
+        assert_eq!(
+            read_all(reopened.get(ID).unwrap()).await.unwrap(),
+            body(100)
+        );
+    }
+
+    #[test]
+    fn orphaned_metadata_is_removed() {
+        let dir = temp_dir("orphan");
+        std::fs::write(dir.join(format!("{ID}.json")), b"{}").unwrap();
+        let cache = AudioCache::open(&dir, 1 << 20).unwrap();
+        assert!(!dir.join(format!("{ID}.json")).exists());
+        assert!(!cache.contains(ID));
     }
 
     #[tokio::test(flavor = "multi_thread")]

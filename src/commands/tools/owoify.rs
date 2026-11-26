@@ -56,7 +56,7 @@ pub async fn owoify(
     #[rest]
     text: String,
 ) -> Result<(), Error> {
-    ctx.send(CreateReply::default().embed(embed(ctx, "OwO", &text.owoify(), "").await.unwrap()))
+    ctx.send(CreateReply::default().embed(embed(ctx, "OwO", &text.owoify(), "").await?))
         .await?;
 
     Ok(())

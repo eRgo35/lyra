@@ -56,7 +56,9 @@ COPY --from=tools --chown=lyra:lyra /yt-dlp /opt/yt-dlp/yt-dlp
 COPY docker/entrypoint.sh /usr/local/bin/lyra-entrypoint
 RUN chown lyra:lyra /opt/yt-dlp
 
+# yt-dlp's cache (YouTube player code) in the volume, so it survives restarts.
 ENV PATH="/opt/yt-dlp:${PATH}" \
+    XDG_CACHE_HOME=/home/lyra/data/cache \
     RUST_LOG=info
 USER lyra
 WORKDIR /home/lyra

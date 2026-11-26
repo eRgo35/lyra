@@ -35,11 +35,7 @@ pub async fn ai(
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     ctx.send(
-        CreateReply::default().embed(
-            embed(ctx, "AI Response:", "", iamsorry[response])
-                .await
-                .unwrap(),
-        ),
+        CreateReply::default().embed(embed(ctx, "AI Response:", "", iamsorry[response]).await?),
     )
     .await?;
 
