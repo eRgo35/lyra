@@ -60,6 +60,7 @@ pub struct Enqueuer {
     pub guild_id: GuildId,
     pub http_client: Client,
     pub repeat: Arc<RepeatAll>,
+    pub volumes: Arc<crate::commands::music::volume::Volumes>,
 }
 
 impl Enqueuer {
@@ -84,8 +85,9 @@ impl Enqueuer {
         src: crate::http::Ytdl,
         metadata: AuxMetadata,
     ) -> TrackHandle {
+        let volume = self.volumes.get(self.guild_id);
         let handle = call
-            .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())))
+            .enqueue(Track::new_with_data(src.into(), Arc::new(metadata.clone())).volume(volume))
             .await;
 
         let _ = handle.add_event(
@@ -118,13 +120,23 @@ fn prefetch_next(queue: &TrackQueue, client: &Client) {
     tokio::spawn(crate::http::prefetch(client.clone(), metadata));
 }
 
+/// When a track starts: gives it the guild's current volume (it may have changed
+/// since the track was queued) and prefetches the next one.
 struct PrefetchNext {
     enqueuer: Enqueuer,
 }
 
 #[async_trait]
 impl EventHandler for PrefetchNext {
-    async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
+    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
+        if let EventContext::Track(tracks) = ctx {
+            let volume = self.enqueuer.volumes.get(self.enqueuer.guild_id);
+            for (state, handle) in *tracks {
+                if (state.volume - volume).abs() > f32::EPSILON {
+                    let _ = handle.set_volume(volume);
+                }
+            }
+        }
         let enqueuer = self.enqueuer.clone();
         tokio::spawn(async move {
             if let Some(call) = enqueuer.manager.get(enqueuer.guild_id) {

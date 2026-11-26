@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   after 20 s instead of hanging.
 - `AUDIO_CACHE_SIZE` defaults to `1G` (was `512M`).
 - `queue` shows all tracks, ten per page, with ◀ ▶ buttons.
+- `volume` is kept for the following tracks (it used to reset to 100% on the
+  next one) and is limited to 0–200%.
 - The Docker image keeps yt-dlp's cache in the data volume.
 
 ### Added

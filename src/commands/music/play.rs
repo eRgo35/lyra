@@ -55,6 +55,7 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
         guild_id,
         http_client: ctx.data().media_client.clone(),
         repeat: ctx.data().repeat_all.clone(),
+        volumes: ctx.data().volumes.clone(),
     };
 
     let existing = manager.get(guild_id);

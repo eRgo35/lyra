@@ -36,6 +36,8 @@ pub struct Data {
     /// For music: yt-dlp sources stream through it (`MEDIA_PROXY`).
     pub media_client: HttpClient,
     pub repeat_all: std::sync::Arc<music::repeat_all::RepeatAll>,
+    /// Each guild's `volume`, applied to every track as it starts.
+    pub volumes: Arc<music::volume::Volumes>,
     pub sounds: music::soundboard::store::SoundStore,
     pub reminders: Arc<reminders::Reminders>,
 }
@@ -211,6 +213,7 @@ pub async fn build_client(
                     http_client,
                     media_client: data_media_client,
                     repeat_all,
+                    volumes: Default::default(),
                     sounds: music::soundboard::store::SoundStore::new(SOUNDBOARD_DIR),
                     reminders,
                 })
