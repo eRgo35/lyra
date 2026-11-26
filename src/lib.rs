@@ -29,6 +29,8 @@ pub const SOUNDBOARD_DIR: &str = "data/soundboard";
 pub const REMINDERS_FILE: &str = "data/reminders.json";
 /// Where played tracks are cached (`AUDIO_CACHE_SIZE`).
 pub const AUDIO_CACHE_DIR: &str = "data/audio-cache";
+/// Results of earlier searches, so the same search needs no yt-dlp run.
+pub const SEARCHES_FILE: &str = "data/searches.json";
 
 pub struct Data {
     /// For lookups (`weather`, `whois`, ...).

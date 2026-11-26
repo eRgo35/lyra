@@ -43,7 +43,7 @@ pub async fn seek(
 
     let destination = target.resolve(info.position);
 
-    if let Some(length) = track.data::<AuxMetadata>().duration {
+    if let Some(length) = crate::http::with_cached_details(&track.data::<AuxMetadata>()).duration {
         if destination >= length {
             let msg = format!("The track is only {} long!", format_time(length));
             return reply_error(ctx, &msg).await;

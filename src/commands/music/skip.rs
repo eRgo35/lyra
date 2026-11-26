@@ -1,7 +1,5 @@
-use std::time::Duration;
-
 use crate::{
-    commands::embeds::{embed, error_embed},
+    commands::embeds::{embed, error_embed, format_duration},
     Context, Error,
 };
 use poise::serenity_prelude::{
@@ -58,7 +56,7 @@ async fn generate_embed(
     track: TrackHandle,
     queue_length: usize,
 ) -> Result<CreateEmbed, Error> {
-    let metadata = &*track.data::<AuxMetadata>();
+    let metadata = &crate::http::with_cached_details(&track.data::<AuxMetadata>());
     let AuxMetadata {
         title,
         thumbnail,
@@ -68,8 +66,6 @@ async fn generate_embed(
         ..
     } = metadata;
     let timestamp = Timestamp::now();
-    let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
-    let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
 
     let description = format!("Song skipped! Queue length is {}", queue_length);
 
@@ -87,11 +83,7 @@ async fn generate_embed(
             artist.as_ref().unwrap_or(&"Unknown Artist".to_string()),
             true,
         )
-        .field(
-            "Duration",
-            format!("{:02}:{:02}", duration_minutes, duration_seconds),
-            true,
-        )
+        .field("Duration", format_duration(*duration), true)
         .field("DJ", ctx.author().name.clone(), true)
         .description(description)
         .timestamp(timestamp)

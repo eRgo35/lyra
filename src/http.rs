@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -16,7 +17,7 @@ use symphonia::core::io::MediaSource;
 use tokio::process::Command;
 use tracing::warn;
 
-use crate::audio_cache::{video_id, AudioCache};
+use crate::audio_cache::{video_id, AudioCache, StoredMetadata};
 
 /// The client music sources stream through (see [`media_client`]).
 pub struct HttpKey;
@@ -88,25 +89,146 @@ pub async fn lookup(
     let mut src = ytdl(client, query.clone());
     let metadata = src.aux_metadata().await?;
     if query.starts_with("ytsearch:") && metadata.source_url.is_some() {
-        let mut searches = SEARCHES.lock().unwrap();
-        if searches.len() >= MAX_SEARCHES {
-            searches.clear();
-        }
-        searches.insert(query, metadata);
+        remember_search(query, metadata);
     }
     Ok(src)
 }
 
-/// Results of earlier `ytsearch:` queries, so the same search is not run again.
-static SEARCHES: LazyLock<Mutex<HashMap<String, AuxMetadata>>> = LazyLock::new(Default::default);
+/// Like [`lookup`], but a YouTube URL that would need yt-dlp is answered from YouTube's
+/// oEmbed instead (about 0.1 s, against seconds for yt-dlp on a slow machine). That
+/// metadata has no duration; the stream is resolved when the track is prefetched or
+/// starts, and its full metadata is kept in the audio cache ([`with_cached_details`]).
+/// For tracks that won't play at once. Falls back to [`lookup`].
+pub async fn quick_lookup(
+    client: HttpClient,
+    query: impl Into<String>,
+) -> Result<Ytdl, AudioStreamError> {
+    let query = query.into();
+    if known_metadata(&query).is_none() && video_id(&query).is_some() {
+        match oembed(&client, OEMBED_API, &query).await {
+            Ok(metadata) => return Ok(ytdl(client, query).with_metadata(metadata)),
+            Err(e) => warn!("oEmbed lookup failed, using yt-dlp: {e}"),
+        }
+    }
+    lookup(client, query).await
+}
+
+/// YouTube's oEmbed endpoint.
+const OEMBED_API: &str = "https://www.youtube.com/oembed";
+
+#[derive(Deserialize)]
+struct Oembed {
+    title: String,
+    author_name: Option<String>,
+    thumbnail_url: Option<String>,
+}
+
+/// Title, channel and thumbnail of the YouTube video at `url`.
+async fn oembed(client: &HttpClient, api: &str, url: &str) -> Result<AuxMetadata, String> {
+    let request = client
+        .get(api)
+        .query(&[("url", url), ("format", "json")])
+        .send();
+    let resp = tokio::time::timeout(Duration::from_secs(5), request)
+        .await
+        .map_err(|_| "timed out".to_string())?
+        .and_then(|r| r.error_for_status())
+        .map_err(|e| e.to_string())?;
+    let found: Oembed = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(AuxMetadata {
+        title: Some(found.title),
+        artist: found.author_name.clone(),
+        channel: found.author_name,
+        thumbnail: found.thumbnail_url,
+        source_url: Some(url.to_string()),
+        ..AuxMetadata::default()
+    })
+}
+
+/// `metadata` with the gaps (e.g. the duration of an [`quick_lookup`] track) filled
+/// from the audio cache, once the track has been fetched.
+pub fn with_cached_details(metadata: &AuxMetadata) -> AuxMetadata {
+    let mut metadata = metadata.clone();
+    if metadata.duration.is_some() {
+        return metadata;
+    }
+    let cached = crate::audio_cache::global()
+        .and_then(|cache| cache.metadata(&video_id(metadata.source_url.as_deref()?)?));
+    if let Some(cached) = cached {
+        metadata.duration = cached.duration;
+        metadata.artist = metadata.artist.or(cached.artist);
+        metadata.thumbnail = metadata.thumbnail.or(cached.thumbnail);
+    }
+    metadata
+}
+
+/// Results of earlier `ytsearch:` queries, kept in [`crate::SEARCHES_FILE`].
+struct Searches {
+    path: PathBuf,
+    found: HashMap<String, AuxMetadata>,
+}
+
+impl Searches {
+    /// The searches saved in `path` (none if it is missing or unreadable).
+    fn load(path: impl Into<PathBuf>) -> Self {
+        let path = path.into();
+        let found = std::fs::read(&path)
+            .ok()
+            .and_then(|bytes| {
+                serde_json::from_slice::<HashMap<String, StoredMetadata>>(&bytes).ok()
+            })
+            .map(|stored| stored.into_iter().map(|(k, v)| (k, v.into())).collect())
+            .unwrap_or_default();
+        Searches { path, found }
+    }
+
+    /// Adds a search; all are dropped when there are [`MAX_SEARCHES`].
+    fn insert(&mut self, query: String, metadata: AuxMetadata) {
+        if self.found.len() >= MAX_SEARCHES {
+            self.found.clear();
+        }
+        self.found.insert(query, metadata);
+    }
+
+    fn json(&self) -> Vec<u8> {
+        let stored: HashMap<&String, StoredMetadata> =
+            self.found.iter().map(|(k, v)| (k, v.into())).collect();
+        serde_json::to_vec(&stored).expect("searches serialize")
+    }
+}
+
+static SEARCHES: LazyLock<Mutex<Searches>> =
+    LazyLock::new(|| Mutex::new(Searches::load(crate::SEARCHES_FILE)));
 
 /// The most searches [`SEARCHES`] keeps; it starts over when full.
 const MAX_SEARCHES: usize = 1000;
 
+/// Keeps a search's result, saving the file in the background.
+fn remember_search(query: String, metadata: AuxMetadata) {
+    SEARCHES.lock().unwrap().insert(query, metadata);
+    tokio::task::spawn_blocking(|| {
+        // One save at a time, each with the latest searches.
+        static SAVING: Mutex<()> = Mutex::new(());
+        let _saving = SAVING.lock().unwrap();
+        let searches = SEARCHES.lock().unwrap();
+        let (path, json) = (searches.path.clone(), searches.json());
+        drop(searches);
+        let temporary = path.with_extension("json.tmp");
+        let result = path
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| std::fs::write(&temporary, json))
+            .and_then(|()| std::fs::rename(&temporary, &path));
+        if let Err(e) = result {
+            warn!("Could not save {}: {e}", path.display());
+        }
+    });
+}
+
 /// Metadata for `query` without yt-dlp: from an earlier search, or saved with the
 /// cached audio of a YouTube URL.
 fn known_metadata(query: &str) -> Option<AuxMetadata> {
-    if let Some(found) = SEARCHES.lock().unwrap().get(query) {
+    if let Some(found) = SEARCHES.lock().unwrap().found.get(query) {
         return Some(found.clone());
     }
     let cache = crate::audio_cache::global()?;
@@ -358,7 +480,7 @@ impl Ytdl {
             .carried
             .as_ref()
             .is_some_and(|c| url_fresh(&c.url, SystemTime::now()));
-        let resolved = self.stream_info().await?;
+        let (fresh, resolved) = self.stream_info().await?;
         if *WAIT_FOR_STREAM {
             tokio::time::sleep(wait_for(resolved.available_at, SystemTime::now())).await;
         }
@@ -401,7 +523,8 @@ impl Ytdl {
             .clone()
             .filter(|e| !e.is_empty() && e.bytes().all(|b| b.is_ascii_alphanumeric()))
             .unwrap_or_else(|| "bin".to_string());
-        let metadata = self.known.clone();
+        // A new yt-dlp run has the full metadata (e.g. the duration oEmbed lacks).
+        let metadata = fresh.or_else(|| self.known.clone());
         match cache.download(&id, &ext, metadata, self.client.clone(), request, resp) {
             Ok(input) => Ok(AudioStream { input }),
             Err(e) => {
@@ -412,11 +535,15 @@ impl Ytdl {
         }
     }
 
-    /// The kept stream info if it is still fresh, otherwise a new yt-dlp run.
-    async fn stream_info(&mut self) -> Result<Resolved, AudioStreamError> {
+    /// The kept stream info if it is still fresh, otherwise a new yt-dlp run (with
+    /// the metadata it found).
+    async fn stream_info(&mut self) -> Result<(Option<AuxMetadata>, Resolved), AudioStreamError> {
         match self.carried.take() {
-            Some(carried) if url_fresh(&carried.url, SystemTime::now()) => Ok(carried),
-            _ => Ok(self.resolve().await?.1),
+            Some(carried) if url_fresh(&carried.url, SystemTime::now()) => Ok((None, carried)),
+            _ => {
+                let (metadata, resolved) = self.resolve().await?;
+                Ok((Some(metadata), resolved))
+            }
         }
     }
 }
@@ -677,6 +804,63 @@ mod tests {
         assert_eq!(wait_for(Some(1_004.5), now), Duration::from_millis(5_500));
         assert_eq!(wait_for(Some(1e12), now), MAX_WAIT);
         assert_eq!(wait_for(Some(f64::NAN), now), Duration::ZERO);
+    }
+
+    #[tokio::test]
+    async fn oembed_gives_title_channel_and_thumbnail() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(wiremock::matchers::query_param("url", SOURCE))
+            .and(wiremock::matchers::query_param("format", "json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "title": "Never Gonna Give You Up",
+                "author_name": "Rick Astley",
+                "thumbnail_url": "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            })))
+            .mount(&server)
+            .await;
+        let metadata = super::oembed(&reqwest::Client::new(), &server.uri(), SOURCE)
+            .await
+            .unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("Never Gonna Give You Up"));
+        assert_eq!(metadata.artist.as_deref(), Some("Rick Astley"));
+        assert_eq!(metadata.source_url.as_deref(), Some(SOURCE));
+        assert!(metadata.thumbnail.is_some());
+        assert_eq!(metadata.duration, None);
+    }
+
+    #[tokio::test]
+    async fn oembed_errors_are_errors() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+        assert!(
+            super::oembed(&reqwest::Client::new(), &server.uri(), SOURCE)
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn searches_survive_a_restart() {
+        let path = temp_dir("searches").join("searches.json");
+        let metadata = AuxMetadata {
+            title: Some("T".into()),
+            duration: Some(Duration::from_secs(61)),
+            source_url: Some(SOURCE.into()),
+            ..AuxMetadata::default()
+        };
+        let mut searches = super::Searches::load(&path);
+        assert!(searches.found.is_empty());
+        searches.insert("ytsearch:t".into(), metadata.clone());
+        std::fs::write(&path, searches.json()).unwrap();
+
+        let reloaded = super::Searches::load(&path);
+        assert_eq!(reloaded.found.get("ytsearch:t"), Some(&metadata));
+        std::fs::write(&path, "not json").unwrap();
+        assert!(super::Searches::load(&path).found.is_empty());
     }
 
     #[test]

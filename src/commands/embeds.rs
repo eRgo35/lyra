@@ -80,6 +80,14 @@ pub async fn embed(
     Ok(embed)
 }
 
+/// `03:45`, or `--:--` while the duration is not known yet.
+pub fn format_duration(duration: Option<std::time::Duration>) -> String {
+    match duration {
+        Some(d) => format!("{:02}:{:02}", d.as_secs() / 60, d.as_secs() % 60),
+        None => "--:--".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::append_detail;

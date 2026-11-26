@@ -1,7 +1,7 @@
 use crate::commands::music::notifier::TrackErrorNotifier;
 use crate::commands::music::repeat_all::Enqueuer;
 use crate::{
-    commands::embeds::{error_embed, with_detail},
+    commands::embeds::{error_embed, format_duration, with_detail},
     Context, Error,
 };
 
@@ -88,7 +88,13 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
             None => None,
         }
     };
-    let (resolved, joined) = tokio::join!(resolve(ctx, song, &enqueuer, force), join);
+    // Something already playing: the new track has time to be resolved later.
+    let busy = match &existing {
+        Some(call) => !call.lock().await.queue().is_empty(),
+        None => false,
+    };
+    let quick = busy && !force;
+    let (resolved, joined) = tokio::join!(resolve(ctx, song, &enqueuer, force, quick), join);
 
     let call = match (existing, joined) {
         (Some(call), _) => call,
@@ -134,12 +140,14 @@ pub(super) async fn enqueue_song(ctx: Context<'_>, song: String, force: bool) ->
 }
 
 /// The first track's source (`None` after telling the user why it can't be played)
-/// and the rest of the entries.
+/// and the rest of the entries. With `quick`, a YouTube URL is looked up with
+/// [`crate::http::quick_lookup`].
 async fn resolve(
     ctx: Context<'_>,
     song: String,
     enqueuer: &Enqueuer,
     force: bool,
+    quick: bool,
 ) -> Result<(Option<Ytdl>, VecDeque<Entry>), Error> {
     let mut results = match parse_data(song).await {
         Ok(results) => results,
@@ -165,6 +173,18 @@ async fn resolve(
     let src = match first.metadata {
         Some(metadata) => {
             crate::http::ytdl(enqueuer.http_client.clone(), first.query).with_metadata(metadata)
+        }
+        None if quick => {
+            match crate::http::quick_lookup(enqueuer.http_client.clone(), first.query).await {
+                Ok(src) => src,
+                Err(e) => {
+                    warn!("Failed to load track metadata: {e}");
+                    let msg = with_detail("Could not load that track!", &e);
+                    ctx.send(CreateReply::default().embed(error_embed(ctx, &msg).await?))
+                        .await?;
+                    return Ok((None, results));
+                }
+            }
         }
         None => match lookup_source(enqueuer, first.query).await {
             Ok(src) => src,
@@ -406,8 +426,6 @@ async fn generate_embed(
         duration,
         ..
     } = metadata;
-    let duration_minutes = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() / 60;
-    let duration_seconds = duration.unwrap_or(Duration::new(0, 0)).clone().as_secs() % 60;
     let mut description = format!("Enqueued @ {}", position + 1);
     let mut tracks = "Tracks enqueued";
 
@@ -429,11 +447,7 @@ async fn generate_embed(
             artist.unwrap_or("Unknown Artist".to_string()),
             true,
         )
-        .field(
-            "Duration",
-            format!("{:02}:{:02}", duration_minutes, duration_seconds),
-            true,
-        )
+        .field("Duration", format_duration(duration), true)
         .field("DJ", ctx.author().name.clone(), true)
         .description(description)
         .timestamp(Timestamp::now())

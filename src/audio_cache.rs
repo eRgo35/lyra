@@ -114,7 +114,7 @@ struct CachedFile {
 
 /// The metadata kept in `<id>.json` (songbird's [`AuxMetadata`] is not serializable).
 #[derive(Serialize, Deserialize)]
-struct StoredMetadata {
+pub(crate) struct StoredMetadata {
     title: Option<String>,
     artist: Option<String>,
     album: Option<String>,

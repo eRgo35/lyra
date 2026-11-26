@@ -90,7 +90,12 @@ async fn page_of(ctx: Context<'_>, queue: &TrackQueue, page: usize) -> (String, 
     let lines: Vec<String> = tracks
         .iter()
         .enumerate()
-        .map(|(index, track)| line(index, &track.data::<AuxMetadata>()))
+        .map(|(index, track)| {
+            line(
+                index,
+                &crate::http::with_cached_details(&track.data::<AuxMetadata>()),
+            )
+        })
         .collect();
 
     let repeat = if ctx
@@ -112,14 +117,12 @@ async fn page_of(ctx: Context<'_>, queue: &TrackQueue, page: usize) -> (String, 
 }
 
 fn line(index: usize, metadata: &AuxMetadata) -> String {
-    let secs = metadata.duration.unwrap_or_default().as_secs();
     format!(
-        "{}. {} - {} [{:02}:{:02}]",
+        "{}. {} - {} [{}]",
         index,
         metadata.title.as_deref().unwrap_or("Unknown Title"),
         metadata.artist.as_deref().unwrap_or("Unknown Artist"),
-        secs / 60,
-        secs % 60
+        crate::commands::embeds::format_duration(metadata.duration)
     )
 }
 

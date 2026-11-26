@@ -12,8 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   current one starts, so there is no gap between tracks even where yt-dlp is
   slow (songbird only readied it 5 s ahead).
 - Cached tracks and repeated searches are enqueued without running yt-dlp: the
-  cache keeps each track's metadata (`<id>.json`), and search results are
-  remembered while the bot runs.
+  cache keeps each track's metadata (`<id>.json`), and search results are kept
+  in `data/searches.json`, so they survive restarts.
+- A YouTube link added while something is playing is answered at once from
+  YouTube's oEmbed (about 0.1 s instead of up to 10 s for yt-dlp on a slow
+  machine); its stream and duration are fetched in the background before it
+  plays. Unknown durations show as `--:--`.
 - `play`, `forceplay`, `effect` and `stream` no longer hold the voice call's lock
   while yt-dlp runs, so `skip`, `queue`, `pause` etc. answer at once while a track
   is loading. `play` joins the channel and resolves the track at the same time.
